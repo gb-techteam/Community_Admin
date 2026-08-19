@@ -47,7 +47,54 @@ async function fetchMomentumTotals() {
   }
 }
 
+function emptyDashboardPayload() {
+  return {
+    stats: {
+      students: 0,
+      courses: 0,
+      enrollments: 0,
+      activeCourses: 0,
+      batches: 0,
+      openBatches: 0,
+      activeBatches: 0,
+      studentsWithPhone: 0,
+      studentsWithTelegram: 0,
+      channels: 0,
+      activeChannels: 0,
+      channelMessages: 0,
+      channelMembers: 0,
+      channelAdmins: 0,
+      portalAdmins: 0,
+      activePortalAdmins: 0,
+      signalGivers: 0,
+      staffAdmins: 0,
+      adminTypes: 0,
+      superkandleMembers: 0,
+      superkandleActive: 0,
+      superkandleExpired: 0,
+      superkandleExpiring: 0,
+      superkandlePending: 0,
+      superkandlePaid: 0,
+      superkandlePlans: 0,
+      superkandleActivePlans: 0,
+    },
+    paymentBreakdown: [],
+    enrollmentStatus: [],
+    recentStudents: [],
+    recentEnrollments: [],
+    courseBreakdown: [],
+    recentChannels: [],
+    recentAdmins: [],
+    adminTypeBreakdown: [],
+    recentBatches: [],
+  };
+}
+
 router.get("/stats", async (_req, res) => {
+  const momentumPromise = fetchMomentumTotals();
+  let payload = emptyDashboardPayload();
+  let dbError = null;
+
   try {
     const [
       students,
@@ -81,7 +128,6 @@ router.get("/stats", async (_req, res) => {
       skStats,
       skExpiring,
       skPlans,
-      momentum,
     ] = await Promise.all([
       pool.query("SELECT COUNT(*)::int AS count FROM students"),
       pool.query("SELECT COUNT(*)::int AS count FROM courses"),
@@ -283,14 +329,12 @@ router.get("/stats", async (_req, res) => {
           COUNT(*) FILTER (WHERE is_active = TRUE)::int AS active
         FROM superkandle_plans
       `),
-      fetchMomentumTotals(),
     ]);
 
     const sk = skStats.rows[0] || {};
     const plans = skPlans.rows[0] || {};
 
-    res.json({
-      success: true,
+    payload = {
       stats: {
         students: students.rows[0].count,
         courses: courses.rows[0].count,
@@ -320,7 +364,6 @@ router.get("/stats", async (_req, res) => {
         superkandlePlans: plans.total || 0,
         superkandleActivePlans: plans.active || 0,
       },
-      momentum,
       paymentBreakdown: paymentBreakdown.rows,
       enrollmentStatus: enrollmentStatus.rows,
       recentStudents: recentStudents.rows,
@@ -330,11 +373,22 @@ router.get("/stats", async (_req, res) => {
       recentAdmins: recentAdmins.rows,
       adminTypeBreakdown: adminTypeBreakdown.rows,
       recentBatches: recentBatches.rows,
-    });
+    };
   } catch (error) {
-    console.error("Stats error:", error.message);
-    res.status(500).json({ success: false, message: "Failed to load stats" });
+    dbError = error.message;
+    console.error("Stats DB error:", error.message);
+    payload = emptyDashboardPayload();
   }
+
+  const momentum = await momentumPromise;
+
+  res.json({
+    success: true,
+    ...payload,
+    momentum,
+    dbUnavailable: Boolean(dbError),
+    dbError: dbError || undefined,
+  });
 });
 
 export default router;
