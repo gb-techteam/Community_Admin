@@ -15,7 +15,10 @@ import channelRoutes from "./routes/channels.js";
 import portalAdminRoutes from "./routes/portalAdmins.js";
 import adminTypeRoutes from "./routes/adminTypes.js";
 import superkandleRoutes from "./routes/superkandle.js";
+import superkandleSubscribeRoutes from "./routes/superkandleSubscribe.js";
 import momentumRoutes from "./routes/momentum.js";
+import settingsRoutes from "./routes/settings.js";
+import { startExpiryMailJob } from "./services/superkandleMails.js";
 
 dotenv.config();
 
@@ -35,8 +38,10 @@ app.use("/api/batches", batchRoutes);
 app.use("/api/channels", channelRoutes);
 app.use("/api/portal-admins", portalAdminRoutes);
 app.use("/api/admin-types", adminTypeRoutes);
+app.use("/api/superkandle/subscribe", superkandleSubscribeRoutes);
 app.use("/api/superkandle", superkandleRoutes);
 app.use("/api/momentum", momentumRoutes);
+app.use("/api/settings", settingsRoutes);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -67,6 +72,7 @@ async function start() {
   }
 
   attachChannelRealtime(server);
+  startExpiryMailJob();
 
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

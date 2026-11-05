@@ -1,5 +1,19 @@
 import { useEffect, useState } from "react";
-import { BadgeDollarSign, CandlestickChart, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  BadgeDollarSign,
+  Ban,
+  CircleDollarSign,
+  Clock3,
+  Copy,
+  KeyRound,
+  Link2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Users,
+  UserCheck,
+} from "lucide-react";
 import { api } from "../lib/api";
 import { useFeedback } from "../lib/feedback";
 import { EntityCell, MetricCell } from "../components/TableCells";
@@ -18,6 +32,15 @@ function formatDate(value) {
     day: "2-digit",
     month: "short",
     year: "numeric",
+  });
+}
+
+function money(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
   });
 }
 
@@ -49,16 +72,20 @@ export default function Superkandle() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [expiryFilter, setExpiryFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [checkout, setCheckout] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   async function loadMembers(
     query = search,
     status = statusFilter,
-    expiry = expiryFilter
+    expiry = expiryFilter,
+    payment = paymentFilter
   ) {
     setLoading(true);
     setError("");
@@ -67,6 +94,7 @@ export default function Superkandle() {
       if (query.trim()) params.set("search", query.trim());
       if (status !== "all") params.set("status", status);
       if (expiry !== "all") params.set("expiry", expiry);
+      if (payment !== "all") params.set("payment", payment);
 
       const data = await api(
         `/api/superkandle${params.toString() ? `?${params.toString()}` : ""}`
@@ -81,8 +109,39 @@ export default function Superkandle() {
   }
 
   useEffect(() => {
-    loadMembers("", "all", "all");
+    loadMembers("", "all", "all", "all");
+    api("/api/superkandle/checkout-settings")
+      .then(setCheckout)
+      .catch(() => {});
   }, []);
+
+  async function copySubscribeLink() {
+    const path = checkout?.subscribePath || "/subscribe/superkandle";
+    const url = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      notify({
+        title: "Link copied",
+        message: "Share this with students. They must verify email first.",
+      });
+      setTimeout(() => setCopiedLink(false), 1600);
+    } catch {
+      setError("Could not copy the subscribe link");
+    }
+  }
+
+  function applyView({
+    status = statusFilter,
+    expiry = expiryFilter,
+    payment = paymentFilter,
+    query = search,
+  } = {}) {
+    setStatusFilter(status);
+    setExpiryFilter(expiry);
+    setPaymentFilter(payment);
+    loadMembers(query, status, expiry, payment);
+  }
 
   function openCreate() {
     setEditingMember(null);
@@ -123,21 +182,76 @@ export default function Superkandle() {
     }
   }
 
+  const activeKpi =
+    paymentFilter === "pending"
+      ? "pending"
+      : expiryFilter === "expiring"
+        ? "expiring"
+        : expiryFilter === "expired"
+          ? "expired"
+          : statusFilter === "active" &&
+              expiryFilter === "all" &&
+              paymentFilter === "all"
+            ? "active"
+            : statusFilter === "all" &&
+                expiryFilter === "all" &&
+                paymentFilter === "all"
+              ? "total"
+              : "";
+
+  const banners = [
+    {
+      key: "total",
+      label: "Total seats",
+      value: stats.total,
+      hint: "View all members →",
+      icon: Users,
+      tone: "blue",
+      onClick: () =>
+        applyView({ status: "all", expiry: "all", payment: "all" }),
+    },
+    {
+      key: "active",
+      label: "Active access",
+      value: stats.active,
+      hint: "Currently enabled →",
+      icon: UserCheck,
+      tone: "green",
+      onClick: () =>
+        applyView({ status: "active", expiry: "all", payment: "all" }),
+    },
+    {
+      key: "pending",
+      label: "Pending payments",
+      value: stats.pending_payments,
+      hint: "Collect now →",
+      icon: CircleDollarSign,
+      tone: "purple",
+      onClick: () =>
+        applyView({ status: "all", expiry: "all", payment: "pending" }),
+    },
+  ];
+
   return (
-    <div className="portal-page">
-      <header className="portal-page__header">
+    <div className="portal-page sk-dash">
+      <header className="sk-dash__head">
         <div>
-          <p className="page-kicker">
-            <CandlestickChart size={14} strokeWidth={2} aria-hidden="true" />
-            Products
-          </p>
+          <p className="sk-crumb">Products / Superkandle</p>
           <h1>Superkandle</h1>
-          <p>
-            Manage tool access for students. Fee is $8 / month; payment and
-            expiry are entered manually.
-          </p>
         </div>
-        <div className="admins-header-actions">
+        <div className="sk-dash__actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={copySubscribeLink}
+          >
+            {copiedLink ? (
+              <Copy size={16} strokeWidth={2} aria-hidden="true" />
+            ) : (
+              <Link2 size={16} strokeWidth={2} aria-hidden="true" />
+            )}
+            {copiedLink ? "Copied" : "Copy student link"}
+          </button>
           <button
             type="button"
             className="btn-plans"
@@ -153,37 +267,86 @@ export default function Superkandle() {
         </div>
       </header>
 
-      <section className="admins-stats" aria-label="Superkandle summary">
-        <article className="admins-stat">
-          <div className="admins-stat__body">
-            <strong>{loading ? "—" : stats.total}</strong>
-            <span>Total members</span>
+      {checkout && !checkout.walletConfigured ? (
+        <p className="sk-sub__note">
+          Set the USDT BEP20 wallet in Settings to accept student payments. Free
+          trial still works.
+        </p>
+      ) : null}
+
+      <section className="sk-banners" aria-label="Superkandle summary">
+        {banners.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              className={`sk-banner sk-banner--${item.tone} ${
+                activeKpi === item.key ? "is-on" : ""
+              }`}
+              onClick={item.onClick}
+            >
+              <span className="sk-banner__icon" aria-hidden="true">
+                <Icon size={18} strokeWidth={2} />
+              </span>
+              <span>
+                <span className="sk-banner__label">{item.label}</span>
+                <strong className="sk-banner__value">
+                  {loading ? "—" : item.value}
+                </strong>
+                <span className="sk-banner__hint">{item.hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </section>
+
+      <section className="sk-strip" aria-label="More metrics">
+        <div className="sk-strip__pin">
+          <span className="sk-strip__icon" aria-hidden="true">
+            <KeyRound size={16} strokeWidth={2} />
+          </span>
+          <div className="sk-strip__meta">
+            <span>Standard fee</span>
+            <strong>
+              $8 <em>/ month</em>
+            </strong>
           </div>
-        </article>
-        <article className="admins-stat">
-          <div className="admins-stat__body">
-            <strong>{loading ? "—" : stats.active}</strong>
-            <span>Active</span>
-          </div>
-        </article>
-        <article className="admins-stat">
-          <div className="admins-stat__body">
-            <strong>{loading ? "—" : stats.expiring}</strong>
+        </div>
+        <button
+          type="button"
+          className={`sk-strip__stat sk-strip__stat--warn ${
+            activeKpi === "expiring" ? "is-on" : ""
+          }`}
+          onClick={() =>
+            applyView({ status: "all", expiry: "expiring", payment: "all" })
+          }
+        >
+          <span className="sk-strip__icon" aria-hidden="true">
+            <Clock3 size={16} strokeWidth={2} />
+          </span>
+          <div className="sk-strip__meta">
             <span>Expiring soon</span>
+            <strong>{loading ? "—" : stats.expiring}</strong>
           </div>
-        </article>
-        <article className="admins-stat">
-          <div className="admins-stat__body">
-            <strong>{loading ? "—" : stats.expired}</strong>
+        </button>
+        <button
+          type="button"
+          className={`sk-strip__stat sk-strip__stat--risk ${
+            activeKpi === "expired" ? "is-on" : ""
+          }`}
+          onClick={() =>
+            applyView({ status: "all", expiry: "expired", payment: "all" })
+          }
+        >
+          <span className="sk-strip__icon" aria-hidden="true">
+            <Ban size={16} strokeWidth={2} />
+          </span>
+          <div className="sk-strip__meta">
             <span>Expired</span>
+            <strong>{loading ? "—" : stats.expired}</strong>
           </div>
-        </article>
-        <article className="admins-stat">
-          <div className="admins-stat__body">
-            <strong>{loading ? "—" : stats.pending_payments}</strong>
-            <span>Pending payments</span>
-          </div>
-        </article>
+        </button>
       </section>
 
       {error ? <p className="portal-alert">{error}</p> : null}
@@ -203,29 +366,41 @@ export default function Superkandle() {
         />
       ) : null}
 
-      <section className="admins-panel">
+      <section className="sk-roster">
+        <div className="sk-roster__head">
+          <div>
+            <h2>Member roster</h2>
+            <p>Student, plan, payment, and expiry in one list.</p>
+          </div>
+          <p className="sk-roster__count">
+            <strong>{loading ? "…" : members.length}</strong> shown
+          </p>
+        </div>
+
         <div className="admins-panel__toolbar">
-          <div className="filter-bar__search">
+          <div className="admins-search">
             <Search size={16} strokeWidth={2} aria-hidden="true" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search members"
+              placeholder="Search name, email, phone, or plan"
               onKeyDown={(e) => {
                 if (e.key === "Enter") loadMembers();
               }}
             />
           </div>
           <div className="filter-bar__select">
-            <label htmlFor="skStatusFilter">Member</label>
+            <label htmlFor="skStatusFilter">Access</label>
             <select
               id="skStatusFilter"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) =>
+                applyView({ status: e.target.value, query: search })
+              }
             >
               <option value="all">All</option>
-              <option value="active">Active only</option>
-              <option value="inactive">Inactive only</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
           <div className="filter-bar__select">
@@ -233,7 +408,9 @@ export default function Superkandle() {
             <select
               id="skExpiryFilter"
               value={expiryFilter}
-              onChange={(e) => setExpiryFilter(e.target.value)}
+              onChange={(e) =>
+                applyView({ expiry: e.target.value, query: search })
+              }
             >
               <option value="all">All</option>
               <option value="valid">Valid</option>
@@ -241,44 +418,75 @@ export default function Superkandle() {
               <option value="expired">Expired</option>
             </select>
           </div>
+          <div className="filter-bar__select">
+            <label htmlFor="skPaymentFilter">Payment</label>
+            <select
+              id="skPaymentFilter"
+              value={paymentFilter}
+              onChange={(e) =>
+                applyView({ payment: e.target.value, query: search })
+              }
+            >
+              <option value="all">All</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
           <button
             type="button"
             className="btn-secondary"
             onClick={() => loadMembers()}
           >
-            Apply
+            Search
           </button>
         </div>
 
-        <div className="table-shell">
-          <table>
+        <div className="table-wrap">
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Student</th>
                 <th>Plan</th>
                 <th>Payment</th>
-                <th>Amount</th>
+                <th className="is-num">Amount</th>
                 <th>Expiry</th>
-                <th>Status</th>
-                <th />
+                <th>Access</th>
+                <th className="is-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={7} className="table-empty">
-                    Loading members…
+                    <div className="sk-empty">
+                      <strong>Loading roster</strong>
+                      <span>Fetching memberships and billing…</span>
+                    </div>
                   </td>
                 </tr>
               ) : members.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="table-empty">
-                    No Superkandle members yet. Add a student to get started.
+                    <div className="sk-empty">
+                      <span className="sk-empty__icon" aria-hidden="true">
+                        <Users size={20} strokeWidth={2} />
+                      </span>
+                      <strong>No members in this view</strong>
+                      <span>
+                        Try another filter, or add a student to grant access.
+                      </span>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 members.map((member) => (
-                  <tr key={member.id}>
+                  <tr
+                    key={member.id}
+                    className={
+                      member.expiry_state === "expired" ? "sk-row--risk" : ""
+                    }
+                  >
                     <td>
                       <EntityCell
                         title={fullName(member.first_name, member.last_name)}
@@ -320,10 +528,8 @@ export default function Superkandle() {
                         </span>
                       </div>
                     </td>
-                    <td>
-                      <MetricCell
-                        value={`$${Number(member.amount).toFixed(2)}`}
-                      />
+                    <td className="is-num">
+                      <MetricCell value={money(member.amount)} label="USD" />
                     </td>
                     <td>
                       <div className="sk-pay-cell">
@@ -348,7 +554,7 @@ export default function Superkandle() {
                         {member.is_active ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td>
+                    <td className="is-actions">
                       <div className="row-actions">
                         <button
                           type="button"

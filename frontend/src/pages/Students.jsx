@@ -13,10 +13,37 @@ const emptyForm = {
   address: "",
   dateOfBirth: "",
   telegramUser: "",
+  tradingviewUsername: "",
 };
 
 function fullName(first, last) {
   return [first, last].filter(Boolean).join(" ").trim() || "—";
+}
+
+function displayValue(value, fallback = "—") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+  const text = String(value).slice(0, 10);
+  return text || "—";
+}
+
+function formFromStudent(student) {
+  return {
+    firstName: student.first_name || "",
+    lastName: student.last_name || "",
+    email: student.email || "",
+    phone: student.phone || "",
+    address: student.address || "",
+    dateOfBirth: student.date_of_birth
+      ? String(student.date_of_birth).slice(0, 10)
+      : "",
+    telegramUser: student.telegram_user || "",
+    tradingviewUsername: student.tradingview_username || "",
+  };
 }
 
 function BatchTags({ value }) {
@@ -40,8 +67,8 @@ export default function Students() {
   const [search, setSearch] = useState("");
   const [batchFilter, setBatchFilter] = useState("all");
   const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [showForm, setShowForm] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -67,6 +94,10 @@ export default function Students() {
         `/api/students${params.toString() ? `?${params.toString()}` : ""}`
       );
       setStudents(data.students);
+      setSelectedStudent((current) => {
+        if (!current) return current;
+        return data.students.find((row) => row.id === current.id) || current;
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -79,39 +110,33 @@ export default function Students() {
     loadStudents("", "all");
   }, []);
 
-  function openEdit(student) {
-    setEditingId(student.id);
-    setForm({
-      firstName: student.first_name || "",
-      lastName: student.last_name || "",
-      email: student.email || "",
-      phone: student.phone || "",
-      address: student.address || "",
-      dateOfBirth: student.date_of_birth
-        ? String(student.date_of_birth).slice(0, 10)
-        : "",
-      telegramUser: student.telegram_user || "",
-    });
-    setShowForm(true);
+  function openView(student) {
+    setSelectedStudent(student);
+    setForm(formFromStudent(student));
+    setIsEditing(false);
     setError("");
+  }
+
+  function closePanel() {
+    setSelectedStudent(null);
+    setIsEditing(false);
+    setForm(emptyForm);
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!editingId) return;
+    if (!selectedStudent) return;
 
     setSaving(true);
     setError("");
 
     try {
-      await api(`/api/students/${editingId}`, {
+      await api(`/api/students/${selectedStudent.id}`, {
         method: "PUT",
         body: JSON.stringify(form),
       });
 
-      setShowForm(false);
-      setForm(emptyForm);
-      setEditingId(null);
+      setIsEditing(false);
       await loadStudents();
       notify({
         title: "Student updated",
@@ -151,7 +176,7 @@ export default function Students() {
         <div className="filter-bar__search">
           <input
             type="search"
-            placeholder="Search name, email, or phone"
+            placeholder="Search name, email, phone, Telegram, or TradingView"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
@@ -186,16 +211,81 @@ export default function Students() {
 
       {error ? <p className="portal-alert">{error}</p> : null}
 
-      {showForm && editingId ? (
+      {selectedStudent && !isEditing ? (
+        <section className="entity-form student-detail">
+          <div className="entity-form__header">
+            <h2>
+              {fullName(selectedStudent.first_name, selectedStudent.last_name)}
+            </h2>
+            <button type="button" className="btn-ghost" onClick={closePanel}>
+              Close
+            </button>
+          </div>
+
+          <div className="student-detail__ids">
+            <div className="student-detail__id-card">
+              <span>Telegram ID</span>
+              <strong>{displayValue(selectedStudent.telegram_user)}</strong>
+            </div>
+            <div className="student-detail__id-card">
+              <span>TradingView ID</span>
+              <strong>
+                {displayValue(selectedStudent.tradingview_username)}
+              </strong>
+            </div>
+          </div>
+
+          <dl className="student-detail__dl">
+            <div className="student-detail__item">
+              <dt>Email</dt>
+              <dd>{displayValue(selectedStudent.email)}</dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Phone</dt>
+              <dd>{displayValue(selectedStudent.phone, "No phone")}</dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Date of birth</dt>
+              <dd>{formatDate(selectedStudent.date_of_birth)}</dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Courses</dt>
+              <dd>{selectedStudent.course_count ?? 0} enrolled</dd>
+            </div>
+            <div className="student-detail__item student-detail__item--span">
+              <dt>Batch</dt>
+              <dd>
+                <BatchTags value={selectedStudent.batch_names} />
+              </dd>
+            </div>
+            <div className="student-detail__item student-detail__item--span">
+              <dt>Address</dt>
+              <dd>{displayValue(selectedStudent.address)}</dd>
+            </div>
+          </dl>
+
+          <div className="entity-form__actions">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit student
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {selectedStudent && isEditing ? (
         <form className="entity-form" onSubmit={handleSubmit}>
           <div className="entity-form__header">
             <h2>Edit student</h2>
             <button
               type="button"
               className="btn-ghost"
-              onClick={() => setShowForm(false)}
+              onClick={() => setIsEditing(false)}
             >
-              Close
+              Back to details
             </button>
           </div>
 
@@ -247,12 +337,22 @@ export default function Students() {
               />
             </div>
             <div className="field">
-              <label htmlFor="telegramUser">Telegram</label>
+              <label htmlFor="telegramUser">Telegram ID</label>
               <input
                 id="telegramUser"
                 value={form.telegramUser}
                 onChange={(e) =>
                   setForm({ ...form, telegramUser: e.target.value })
+                }
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="tradingviewUsername">TradingView ID</label>
+              <input
+                id="tradingviewUsername"
+                value={form.tradingviewUsername}
+                onChange={(e) =>
+                  setForm({ ...form, tradingviewUsername: e.target.value })
                 }
               />
             </div>
@@ -295,14 +395,13 @@ export default function Students() {
                 <th>Contact</th>
                 <th>Batch</th>
                 <th className="is-num">Courses</th>
-                <th>Telegram</th>
                 <th className="is-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="table-empty">
+                  <td colSpan={5} className="table-empty">
                     <div className="table-empty__box">
                       <strong>Loading students</strong>
                       <span>Fetching student records…</span>
@@ -311,7 +410,7 @@ export default function Students() {
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="table-empty">
+                  <td colSpan={5} className="table-empty">
                     <div className="table-empty__box">
                       <strong>No students found</strong>
                       <span>Try another batch filter or search term.</span>
@@ -342,15 +441,14 @@ export default function Students() {
                     <td className="is-num">
                       <MetricCell value={student.course_count} label="enrolled" />
                     </td>
-                    <td>{student.telegram_user || "—"}</td>
                     <td className="is-actions">
                       <div className="row-actions">
                         <button
                           type="button"
                           className="btn-ghost"
-                          onClick={() => openEdit(student)}
+                          onClick={() => openView(student)}
                         >
-                          Edit
+                          View
                         </button>
                       </div>
                     </td>
