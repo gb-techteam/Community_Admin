@@ -8,11 +8,10 @@ export async function smtpReady() {
 
 async function subscribeUrl() {
   const settings = await loadSettings();
-  const base = String(settings.publicAppUrl || "http://localhost:5173").replace(
+  return String(settings.publicAppUrl || "http://localhost:5174").replace(
     /\/$/,
     ""
   );
-  return `${base}/subscribe/superkandle`;
 }
 
 async function sendMail({ to, subject, text, html }) {

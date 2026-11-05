@@ -136,7 +136,10 @@ export default function Settings() {
             <SettingsIcon size={18} strokeWidth={2} aria-hidden="true" />
             <div>
               <h2>Student link</h2>
-              <p>Used in expiry emails and the public subscribe page.</p>
+              <p>
+                Student checkout site (separate Vite app). Used in emails and
+                Copy student link.
+              </p>
             </div>
           </div>
           <div className="form-grid">
@@ -146,7 +149,7 @@ export default function Settings() {
                 id="publicAppUrl"
                 value={form.publicAppUrl}
                 onChange={(e) => update("publicAppUrl", e.target.value)}
-                placeholder="https://admin.yourdomain.com"
+                placeholder="https://subscribe.yourdomain.com"
                 disabled={loading}
               />
             </div>

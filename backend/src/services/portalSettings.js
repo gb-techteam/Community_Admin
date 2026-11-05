@@ -45,7 +45,7 @@ export async function loadSettings() {
       "https://bsc-dataseed.binance.org",
     publicAppUrl:
       pick(db, "publicAppUrl", process.env.PUBLIC_APP_URL).trim() ||
-      "http://localhost:5173",
+      "http://localhost:5174",
     smtpHost: pick(db, "smtpHost", process.env.SMTP_HOST).trim(),
     smtpPort: pick(db, "smtpPort", process.env.SMTP_PORT || "587").trim(),
     smtpUser: pick(db, "smtpUser", process.env.SMTP_USER).trim(),
@@ -74,7 +74,7 @@ export function publicSettings(settings) {
     ),
     smtpPassSet: Boolean(settings.smtpPass),
     expiryNoticeDays: settings.expiryNoticeDays,
-    subscribePath: "/subscribe/superkandle",
+    subscribeUrl: settings.publicAppUrl,
   };
 }
 

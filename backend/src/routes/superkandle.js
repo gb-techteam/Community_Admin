@@ -6,6 +6,7 @@ import {
   markTrialClaimedMany,
 } from "../services/superkandleAccess.js";
 import { receiveWallet } from "../services/bscUsdt.js";
+import { loadSettings } from "../services/portalSettings.js";
 import { notifyMembershipActivated } from "../services/superkandleMails.js";
 
 const router = express.Router();
@@ -77,13 +78,17 @@ function memberSelect(where = "", order = "m.created_at DESC, m.id DESC") {
       m.payment_note,
       m.expires_at,
       m.is_active,
+      m.access_shared,
+      m.access_shared_at,
       m.created_at,
       m.updated_at,
       s.first_name,
       s.last_name,
       s.email,
       s.phone,
+      s.tradingview_username,
       p.name AS plan_name,
+      p.is_trial AS plan_is_trial,
       p.amount AS plan_amount,
       p.offer_price AS plan_offer_price,
       COALESCE(p.duration_value, p.duration_months, 1) AS plan_duration_value,
@@ -258,9 +263,10 @@ router.get("/plans", async (_req, res) => {
 router.get("/checkout-settings", async (_req, res) => {
   try {
     const wallet = await receiveWallet();
+    const settings = await loadSettings();
     res.json({
       success: true,
-      subscribePath: "/subscribe/superkandle",
+      subscribeUrl: settings.publicAppUrl,
       usdtNetwork: "BEP20",
       walletConfigured: Boolean(wallet),
       wallet,
@@ -443,6 +449,7 @@ router.get("/", async (req, res) => {
     const status = (req.query.status || "all").trim();
     const expiry = (req.query.expiry || "all").trim();
     const payment = (req.query.payment || "all").trim();
+    const accessShared = String(req.query.accessShared || "all").toLowerCase();
     const params = [];
     const filters = [];
 
@@ -486,6 +493,10 @@ router.get("/", async (req, res) => {
       filters.push(`m.payment_status = $${params.length}`);
     }
 
+    if (accessShared === "true" || accessShared === "false") {
+      filters.push(`m.access_shared = ${accessShared === "true"}`);
+    }
+
     const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
     const result = await pool.query(memberSelect(where), params);
 
@@ -501,7 +512,9 @@ router.get("/", async (req, res) => {
             AND expires_at >= CURRENT_DATE
             AND expires_at <= CURRENT_DATE + INTERVAL '7 days'
         )::int AS expiring,
-        COUNT(*) FILTER (WHERE payment_status = 'pending')::int AS pending_payments
+        COUNT(*) FILTER (WHERE payment_status = 'pending')::int AS pending_payments,
+        COUNT(*) FILTER (WHERE access_shared = TRUE)::int AS access_shared,
+        COUNT(*) FILTER (WHERE access_shared = FALSE)::int AS access_pending
       FROM superkandle_members
     `);
 
@@ -516,6 +529,124 @@ router.get("/", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to load Superkandle members",
+    });
+  }
+});
+
+function parseAccessShared(value) {
+  if (value === true || value === "true" || value === "1") return true;
+  if (value === false || value === "false" || value === "0") return false;
+  return null;
+}
+
+function registeredStudent(row) {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone,
+    tradingviewUsername: row.tradingview_username || null,
+    planId: row.plan_id,
+    planName: row.plan_name,
+    isTrial: Boolean(row.plan_is_trial),
+    amount: row.amount != null ? Number(row.amount) : null,
+    paymentStatus: row.payment_status,
+    paymentMethod: row.payment_method,
+    paymentDate: row.payment_date,
+    expiresAt: row.expires_at,
+    expiryState: row.expiry_state,
+    isActive: row.is_active,
+    accessShared: Boolean(row.access_shared),
+    accessSharedAt: row.access_shared_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+router.get("/registered", async (req, res) => {
+  try {
+    const search = (req.query.search || "").trim();
+    const accessShared = String(req.query.accessShared || "all").toLowerCase();
+    const params = [];
+    const filters = [];
+
+    if (search) {
+      params.push(`%${search}%`);
+      filters.push(`
+        (
+          s.first_name ILIKE $${params.length}
+          OR s.last_name ILIKE $${params.length}
+          OR s.email ILIKE $${params.length}
+          OR s.phone ILIKE $${params.length}
+          OR s.tradingview_username ILIKE $${params.length}
+          OR CONCAT(s.first_name, ' ', s.last_name) ILIKE $${params.length}
+          OR p.name ILIKE $${params.length}
+        )
+      `);
+    }
+
+    if (accessShared === "true" || accessShared === "false") {
+      filters.push(`m.access_shared = ${accessShared === "true"}`);
+    }
+
+    const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    const result = await pool.query(memberSelect(where), params);
+
+    res.json({
+      success: true,
+      students: result.rows.map(registeredStudent),
+    });
+  } catch (error) {
+    console.error("List registered superkandle students error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load registered SuperKandle students",
+    });
+  }
+});
+
+router.patch("/:id/access-shared", async (req, res) => {
+  try {
+    const existing = await getMember(req.params.id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Superkandle member not found",
+      });
+    }
+
+    const accessShared = parseAccessShared(req.body?.accessShared);
+    if (accessShared == null) {
+      return res.status(400).json({
+        success: false,
+        message: "accessShared must be true or false",
+      });
+    }
+
+    await pool.query(
+      `
+      UPDATE superkandle_members
+      SET
+        access_shared = $1,
+        access_shared_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
+        updated_at = NOW()
+      WHERE id = $2
+      `,
+      [accessShared, req.params.id]
+    );
+
+    const member = await getMember(req.params.id);
+    res.json({
+      success: true,
+      student: registeredStudent(member),
+    });
+  } catch (error) {
+    console.error("Update access shared error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update accessShared",
     });
   }
 });
@@ -862,6 +993,10 @@ router.put("/:id", async (req, res) => {
       payload.amount != null ? payload.amount : effectivePlanPrice(plan);
     const expiresAt = resolveExpiresAt(payload, plan);
 
+    const accessShared = parseAccessShared(req.body.accessShared);
+    const nextAccessShared =
+      accessShared == null ? Boolean(existing.access_shared) : accessShared;
+
     await pool.query(
       `
       UPDATE superkandle_members
@@ -874,8 +1009,14 @@ router.put("/:id", async (req, res) => {
         payment_note = $6,
         expires_at = $7,
         is_active = $8,
+        access_shared = $9,
+        access_shared_at = CASE
+          WHEN $9 = TRUE AND COALESCE(access_shared, FALSE) = FALSE THEN NOW()
+          WHEN $9 = FALSE THEN NULL
+          ELSE access_shared_at
+        END,
         updated_at = NOW()
-      WHERE id = $9
+      WHERE id = $10
       `,
       [
         payload.planId,
@@ -886,6 +1027,7 @@ router.put("/:id", async (req, res) => {
         payload.paymentNote,
         expiresAt,
         payload.isActive,
+        nextAccessShared,
         req.params.id,
       ]
     );

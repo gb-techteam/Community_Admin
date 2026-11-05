@@ -94,9 +94,10 @@ export async function activateMembership({
       payment_note,
       expires_at,
       is_active,
+      access_shared,
       updated_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW())
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, FALSE, NOW())
     ON CONFLICT (student_id) DO UPDATE SET
       plan_id = EXCLUDED.plan_id,
       amount = EXCLUDED.amount,
