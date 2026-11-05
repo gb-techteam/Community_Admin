@@ -6212,10 +6212,170 @@ body.portal-menu-lock {
 
 .sk-roster .table-wrap {
   border-top: 1px solid rgba(26, 74, 63, 0.08);
+  overflow-x: auto;
+}
+
+.sk-table {
+  table-layout: auto;
+  min-width: 1360px;
+  width: max-content;
+}
+
+.sk-table th,
+.sk-table td {
+  padding: 0.78rem 0.8rem;
+  vertical-align: middle;
+}
+
+.sk-table .sk-col-student {
+  min-width: 220px;
+}
+
+.sk-table .sk-col-tv {
+  min-width: 190px;
+}
+
+.sk-table .sk-col-plan {
+  min-width: 110px;
+}
+
+.sk-table .sk-col-pay,
+.sk-table .sk-col-expiry {
+  min-width: 118px;
+}
+
+.sk-table .sk-col-amount {
+  min-width: 88px;
+  text-align: right;
+}
+
+.sk-table .sk-col-access {
+  min-width: 86px;
+}
+
+.sk-table .sk-col-invite {
+  min-width: 108px;
+}
+
+.sk-table .sk-col-actions {
+  min-width: 168px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sk-table .entity-cell {
+  min-width: 0;
+  max-width: 240px;
+}
+
+.sk-table .entity-cell__text > span {
+  max-width: 180px;
+}
+
+.sk-table .sk-pay-cell {
+  align-items: flex-start;
+}
+
+.sk-table .sk-pay-cell strong {
+  font-size: 0.9rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.sk-table .sk-pay-cell .cell-muted {
+  white-space: nowrap;
+}
+
+.sk-table .sk-col-amount .metric-cell {
+  width: 100%;
+  align-items: flex-end;
+}
+
+.sk-tv-cell,
+.sk-tv-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.sk-tv-name {
+  min-width: 0;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+  font-size: 0.86rem;
+}
+
+.sk-tv-edit input {
+  width: 118px;
+  padding: 0.35rem 0.5rem;
+  border: 1.5px solid #d7e0ea;
+  border-radius: 8px;
+  outline: none;
+}
+
+.sk-tv-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(26, 74, 63, 0.06);
+  color: #35557a;
+  cursor: pointer;
+}
+
+.sk-tv-icon:hover:not(:disabled) {
+  background: rgba(26, 74, 63, 0.12);
+}
+
+.sk-tv-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sk-invite-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.22rem;
+}
+
+.sk-invite-btn {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #35557a;
+  font-size: 0.74rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sk-invite-btn:hover {
+  text-decoration: underline;
+}
+
+.sk-table .row-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 0.3rem;
 }
 
 .sk-row--risk td {
   background: rgba(180, 35, 24, 0.035);
+}
+
+.sk-table tr.sk-row--on td {
+  background: rgba(59, 141, 255, 0.08);
 }
 
 .sk-empty {

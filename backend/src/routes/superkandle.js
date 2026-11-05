@@ -80,6 +80,8 @@ function memberSelect(where = "", order = "m.created_at DESC, m.id DESC") {
       m.is_active,
       m.access_shared,
       m.access_shared_at,
+      m.access_error,
+      m.access_error_message,
       m.created_at,
       m.updated_at,
       s.first_name,
@@ -462,6 +464,7 @@ router.get("/", async (req, res) => {
           OR s.email ILIKE $${params.length}
           OR s.phone ILIKE $${params.length}
           OR CONCAT(s.first_name, ' ', s.last_name) ILIKE $${params.length}
+          OR s.tradingview_username ILIKE $${params.length}
           OR p.name ILIKE $${params.length}
         )
       `);
@@ -560,6 +563,8 @@ function registeredStudent(row) {
     isActive: row.is_active,
     accessShared: Boolean(row.access_shared),
     accessSharedAt: row.access_shared_at,
+    error: Boolean(row.access_error),
+    errorMessage: row.access_error_message || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -590,6 +595,9 @@ router.get("/registered", async (req, res) => {
     if (accessShared === "true" || accessShared === "false") {
       filters.push(`m.access_shared = ${accessShared === "true"}`);
     }
+    if (accessShared === "false") {
+      filters.push("m.access_error = FALSE");
+    }
 
     const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
     const result = await pool.query(memberSelect(where), params);
@@ -607,7 +615,7 @@ router.get("/registered", async (req, res) => {
   }
 });
 
-router.patch("/:id/access-shared", async (req, res) => {
+router.patch("/:id/tradingview", async (req, res) => {
   try {
     const existing = await getMember(req.params.id);
     if (!existing) {
@@ -617,13 +625,52 @@ router.patch("/:id/access-shared", async (req, res) => {
       });
     }
 
-    const accessShared = parseAccessShared(req.body?.accessShared);
-    if (accessShared == null) {
-      return res.status(400).json({
-        success: false,
-        message: "accessShared must be true or false",
+    const username = String(req.body?.tradingviewUsername || "").trim() || null;
+    await pool.query(
+      `
+      UPDATE students
+      SET tradingview_username = $1, updated_at = NOW()
+      WHERE id = $2
+      `,
+      [username, existing.student_id]
+    );
+
+    res.json({
+      success: true,
+      member: await getMember(req.params.id),
+    });
+  } catch (error) {
+    console.error("Update tradingview username error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update TradingView username",
+    });
+  }
+});
+
+router.patch("/:id/access-shared", async (req, res) => {
+  try {
+    const existing = await getMember(req.params.id);
+    if (!existing) {
+      const errorMessage = "Superkandle member not found";
+      return res.status(404).json({
+        error: true,
+        errorMessage,
       });
     }
+
+    const accessShared = parseAccessShared(req.body?.accessShared);
+    if (accessShared == null) {
+      const errorMessage = "accessShared must be true or false";
+      return res.status(400).json({
+        error: true,
+        errorMessage,
+      });
+    }
+
+    const hasError = parseAccessShared(req.body?.error);
+    const accessError = hasError == null ? false : hasError;
+    const errorMessage = String(req.body?.errorMessage || "").trim();
 
     await pool.query(
       `
@@ -631,22 +678,26 @@ router.patch("/:id/access-shared", async (req, res) => {
       SET
         access_shared = $1,
         access_shared_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
+        access_error = $2,
+        access_error_message = $3,
         updated_at = NOW()
-      WHERE id = $2
+      WHERE id = $4
       `,
-      [accessShared, req.params.id]
+      [accessShared, accessError, errorMessage, req.params.id]
     );
 
     const member = await getMember(req.params.id);
+    const student = registeredStudent(member);
     res.json({
-      success: true,
-      student: registeredStudent(member),
+      error: student.error,
+      errorMessage: student.errorMessage,
+      student,
     });
   } catch (error) {
     console.error("Update access shared error:", error.message);
     res.status(500).json({
-      success: false,
-      message: "Failed to update accessShared",
+      error: true,
+      errorMessage: "Failed to update accessShared",
     });
   }
 });
