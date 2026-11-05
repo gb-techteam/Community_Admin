@@ -27,7 +27,42 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const EXTRA_ORIGINS = String(process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((value) => value.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://superkandle.greenbondsacademy.com",
+  ...EXTRA_ORIGINS,
+]);
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  const normalized = String(origin).replace(/\/$/, "");
+  if (ALLOWED_ORIGINS.has(normalized)) return true;
+  try {
+    const { hostname } = new URL(normalized);
+    return (
+      hostname === "greenbondsacademy.com" ||
+      hostname.endsWith(".greenbondsacademy.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (isAllowedOrigin(origin)) return callback(null, true);
+      return callback(null, false);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use("/uploads", express.static(UPLOADS_ROOT, { maxAge: "7d" }));
 
