@@ -14,6 +14,7 @@ import {
   PanelLeft,
   Menu,
   X,
+  Settings,
 } from "lucide-react";
 import logo from "../logo/g-black.png";
 import {
@@ -37,6 +38,12 @@ const managementLinks = [
     to: "/dashboard/admins",
     label: "Admins",
     icon: Shield,
+    show: () => hasPower("create_admins"),
+  },
+  {
+    to: "/dashboard/settings",
+    label: "Settings",
+    icon: Settings,
     show: () => hasPower("create_admins"),
   },
   {

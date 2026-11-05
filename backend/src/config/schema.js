@@ -454,6 +454,68 @@ export async function ensureSuperkandleSchema() {
     ON superkandle_members (payment_status)
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS superkandle_trial_claims (
+      student_id INTEGER PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE,
+      claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS superkandle_student_otps (
+      id SERIAL PRIMARY KEY,
+      student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      email VARCHAR(255) NOT NULL,
+      code_hash TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_superkandle_student_otps_email
+    ON superkandle_student_otps (email, created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS superkandle_payments (
+      id SERIAL PRIMARY KEY,
+      student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      plan_id INTEGER REFERENCES superkandle_plans(id) ON DELETE SET NULL,
+      amount NUMERIC(10, 2) NOT NULL,
+      network VARCHAR(20) NOT NULL DEFAULT 'BEP20',
+      token VARCHAR(20) NOT NULL DEFAULT 'USDT',
+      wallet_to VARCHAR(80),
+      tx_hash VARCHAR(80),
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      confirmed_at TIMESTAMPTZ
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE superkandle_payments
+    ALTER COLUMN amount TYPE NUMERIC(20, 8)
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_superkandle_payments_tx_hash
+    ON superkandle_payments (tx_hash)
+    WHERE tx_hash IS NOT NULL
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS superkandle_expiry_notices (
+      id SERIAL PRIMARY KEY,
+      member_id INTEGER NOT NULL REFERENCES superkandle_members(id) ON DELETE CASCADE,
+      expires_at DATE NOT NULL,
+      notice_type VARCHAR(20) NOT NULL,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (member_id, expires_at, notice_type)
+    )
+  `);
+
   const planCount = await pool.query(
     "SELECT COUNT(*)::int AS count FROM superkandle_plans"
   );
@@ -520,8 +582,19 @@ export async function ensureSuperkandleSchema() {
   `);
 }
 
+export async function ensurePortalSettingsSchema() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS portal_settings (
+      key VARCHAR(80) PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
 export async function ensureAppSchema() {
   await ensurePortalAdminSchema();
   await ensureChannelSchema();
   await ensureSuperkandleSchema();
+  await ensurePortalSettingsSchema();
 }

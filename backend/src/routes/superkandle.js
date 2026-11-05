@@ -1,6 +1,12 @@
 import express from "express";
 import pool from "../config/db.js";
 import { requireAuth, requirePower } from "../middleware/auth.js";
+import {
+  markTrialClaimed,
+  markTrialClaimedMany,
+} from "../services/superkandleAccess.js";
+import { receiveWallet } from "../services/bscUsdt.js";
+import { notifyMembershipActivated } from "../services/superkandleMails.js";
 
 const router = express.Router();
 
@@ -249,6 +255,25 @@ router.get("/plans", async (_req, res) => {
   }
 });
 
+router.get("/checkout-settings", async (_req, res) => {
+  try {
+    const wallet = await receiveWallet();
+    res.json({
+      success: true,
+      subscribePath: "/subscribe/superkandle",
+      usdtNetwork: "BEP20",
+      walletConfigured: Boolean(wallet),
+      wallet,
+    });
+  } catch (error) {
+    console.error("Checkout settings error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load checkout settings",
+    });
+  }
+});
+
 router.post("/plans", async (req, res) => {
   try {
     const payload = normalizePlanPayload(req.body);
@@ -417,6 +442,7 @@ router.get("/", async (req, res) => {
     const search = (req.query.search || "").trim();
     const status = (req.query.status || "all").trim();
     const expiry = (req.query.expiry || "all").trim();
+    const payment = (req.query.payment || "all").trim();
     const params = [];
     const filters = [];
 
@@ -453,6 +479,11 @@ router.get("/", async (req, res) => {
         m.expires_at IS NOT NULL
         AND m.expires_at > CURRENT_DATE + INTERVAL '7 days'
       `);
+    }
+
+    if (PAYMENT_STATUSES.has(payment)) {
+      params.push(payment);
+      filters.push(`m.payment_status = $${params.length}`);
     }
 
     const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
@@ -682,6 +713,14 @@ router.post("/bulk", async (req, res) => {
       ]
     );
 
+    if (plan.is_trial && inserted.rowCount) {
+      const claimed = await pool.query(
+        "SELECT student_id FROM superkandle_members WHERE id = ANY($1::int[])",
+        [inserted.rows.map((row) => row.id)]
+      );
+      await markTrialClaimedMany(claimed.rows.map((row) => row.student_id));
+    }
+
     const added = inserted.rowCount || 0;
     const skipped = studentIds.length - added;
 
@@ -757,7 +796,23 @@ router.post("/", async (req, res) => {
       ]
     );
 
+    if (plan.is_trial) {
+      await markTrialClaimed(payload.studentId);
+    }
+
     const member = await getMember(created.rows[0].id);
+    if (payload.paymentStatus === "paid") {
+      await notifyMembershipActivated({
+        studentId: payload.studentId,
+        planName: plan.name,
+        expiresAt: member?.expires_at,
+        kind: plan.is_trial ? "trial" : "paid",
+        amount,
+        durationValue: plan.duration_value || plan.duration_months,
+        durationUnit: plan.duration_unit,
+        paymentMethod: payload.paymentMethod,
+      });
+    }
     res.status(201).json({ success: true, member });
   } catch (error) {
     if (error.code === "23505") {
@@ -835,7 +890,23 @@ router.put("/:id", async (req, res) => {
       ]
     );
 
+    if (plan.is_trial) {
+      await markTrialClaimed(existing.student_id);
+    }
+
     const member = await getMember(req.params.id);
+    if (payload.paymentStatus === "paid") {
+      await notifyMembershipActivated({
+        studentId: existing.student_id,
+        planName: plan.name,
+        expiresAt: member?.expires_at,
+        kind: plan.is_trial ? "trial" : "paid",
+        amount,
+        durationValue: plan.duration_value || plan.duration_months,
+        durationUnit: plan.duration_unit,
+        paymentMethod: payload.paymentMethod,
+      });
+    }
     res.json({ success: true, member });
   } catch (error) {
     console.error("Update superkandle member error:", error.message);

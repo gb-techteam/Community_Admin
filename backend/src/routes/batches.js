@@ -79,6 +79,7 @@ router.get("/members", requirePower("manage_batches"), async (req, res) => {
         s.email,
         s.phone,
         s.telegram_user,
+        s.tradingview_username,
         b.name AS batch_name,
         c.title AS course_title
       FROM enrollments e

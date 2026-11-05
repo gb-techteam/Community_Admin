@@ -22,6 +22,8 @@ router.get("/", async (req, res) => {
           OR s.last_name ILIKE $${params.length}
           OR s.email ILIKE $${params.length}
           OR s.phone ILIKE $${params.length}
+          OR s.telegram_user ILIKE $${params.length}
+          OR s.tradingview_username ILIKE $${params.length}
           OR CONCAT(s.first_name, ' ', s.last_name) ILIKE $${params.length}
         )
       `);
@@ -52,6 +54,7 @@ router.get("/", async (req, res) => {
         s.address,
         s.date_of_birth,
         s.telegram_user,
+        s.tradingview_username,
         s.created_at,
         s.updated_at,
         COALESCE(
@@ -103,8 +106,16 @@ router.post("/", (_req, res) => {
 
 router.put("/:id", async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, address, dateOfBirth, telegramUser } =
-      req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      address,
+      dateOfBirth,
+      telegramUser,
+      tradingviewUsername,
+    } = req.body;
 
     if (!firstName?.trim() || !email?.trim()) {
       return res.status(400).json({
@@ -124,8 +135,9 @@ router.put("/:id", async (req, res) => {
         address = $5,
         date_of_birth = $6,
         telegram_user = $7,
+        tradingview_username = $8,
         updated_at = NOW()
-      WHERE id = $8
+      WHERE id = $9
       RETURNING *
       `,
       [
@@ -136,6 +148,7 @@ router.put("/:id", async (req, res) => {
         address?.trim() || null,
         dateOfBirth || null,
         telegramUser?.trim() || null,
+        tradingviewUsername?.trim() || null,
         req.params.id,
       ]
     );
