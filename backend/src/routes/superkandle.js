@@ -12,22 +12,12 @@ import { receiveWallet } from "../services/bscUsdt.js";
 import { loadSettings, saveSettings } from "../services/portalSettings.js";
 import {
   notifyInvitationFailed,
-  notifyInvitationSharedOnce,
+  notifyInvitationShared,
   notifyMembershipActivated,
 } from "../services/superkandleMails.js";
 import { broadcastSuperkandleAccess } from "../realtime/channels.js";
 
 const router = express.Router();
-
-router.use((req, _res, next) => {
-  if (req.method !== "GET") {
-    console.log(
-      `SuperKandle ${req.method} ${req.originalUrl}`,
-      JSON.stringify(req.body || {})
-    );
-  }
-  next();
-});
 
 router.use(requireAuth);
 router.use(requirePower("manage_superkandle"));
@@ -755,40 +745,28 @@ router.patch("/:id/access-shared", async (req, res) => {
 
     const hasError = parseAccessShared(req.body?.error);
     const parsedShared = parseAccessShared(
-      req.body?.accessShared ??
-        req.body?.access_shared ??
-        req.body?.student?.accessShared
+      req.body?.accessShared ?? req.body?.access_shared
     );
     const errorMessage = String(
       req.body?.errorMessage ?? req.body?.error_message ?? ""
     ).trim();
-    const isUnmark =
-      parseAccessShared(req.body?.unmark ?? req.body?.undo) === true;
 
-    console.log(
-      "Access-shared PATCH",
-      JSON.stringify({
-        id: req.params.id,
-        hasError,
-        parsedShared,
-        isUnmark,
-        body: req.body,
-      })
-    );
-
-    // This URL is the share-result callback. The bot often still sends
-    // accessShared:false (GET row). Unless error/unmark, mark shared + mail.
     let accessError = false;
-    let accessShared = true;
+    let accessShared = parsedShared;
     if (hasError === true) {
       accessError = true;
       accessShared = false;
-    } else if (isUnmark) {
+    } else if (parsedShared === true) {
+      accessError = false;
+      accessShared = true;
+    } else if (parsedShared === false) {
       accessError = false;
       accessShared = false;
     } else {
-      accessError = false;
-      accessShared = true;
+      return res.status(400).json({
+        error: true,
+        errorMessage: "accessShared must be true or false",
+      });
     }
 
     await pool.query(
@@ -799,7 +777,6 @@ router.patch("/:id/access-shared", async (req, res) => {
         access_shared_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
         access_error = $2,
         access_error_message = $3,
-        invitation_mail_sent_at = CASE WHEN $1 THEN invitation_mail_sent_at ELSE NULL END,
         updated_at = NOW()
       WHERE id = $4
       `,
@@ -816,7 +793,7 @@ router.patch("/:id/access-shared", async (req, res) => {
         member
       );
     } else if (accessShared === true) {
-      mail = await notifyInvitationSharedOnce(member.student_id, member);
+      mail = await notifyInvitationShared(member.student_id, member);
     }
     if (accessShared === true && !mail.sent) {
       console.error(
@@ -1155,7 +1132,6 @@ router.post("/", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   try {
-    console.log("coming in the put api in the id")  
     const existing = await getMember(req.params.id);
     if (!existing) {  
       return res.status(404).json({
@@ -1187,11 +1163,7 @@ router.put("/:id", async (req, res) => {
       payload.amount != null ? payload.amount : effectivePlanPrice(plan);
     const expiresAt = resolveExpiresAt(payload, plan);
 
-    const accessShared = parseAccessShared(
-      req.body.accessShared ??
-        req.body.access_shared ??
-        req.body.student?.accessShared
-    );
+    const accessShared = parseAccessShared(req.body.accessShared);
     const nextAccessShared =
       accessShared == null ? Boolean(existing.access_shared) : accessShared;
 
@@ -1212,10 +1184,6 @@ router.put("/:id", async (req, res) => {
           WHEN $9 = TRUE AND COALESCE(access_shared, FALSE) = FALSE THEN NOW()
           WHEN $9 = FALSE THEN NULL
           ELSE access_shared_at
-        END,
-        invitation_mail_sent_at = CASE
-          WHEN $9 = FALSE THEN NULL
-          ELSE invitation_mail_sent_at
         END,
         updated_at = NOW()
       WHERE id = $10
@@ -1239,9 +1207,6 @@ router.put("/:id", async (req, res) => {
     }
 
     const member = await getMember(req.params.id);
-    if (nextAccessShared === true) {
-      await notifyInvitationSharedOnce(existing.student_id, member);
-    }
     if (payload.paymentStatus === "paid") {
       await notifyMembershipActivated({
         studentId: existing.student_id,

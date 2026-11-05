@@ -131,60 +131,6 @@ export async function notifyInvitationShared(studentId, studentRow = null) {
   }
 }
 
-export async function notifyInvitationSharedOnce(studentId, studentRow = null) {
-  const claimed = await pool.query(
-    `
-    UPDATE superkandle_members
-    SET invitation_mail_sent_at = NOW(), updated_at = NOW()
-    WHERE student_id = $1
-      AND access_shared = TRUE
-      AND invitation_mail_sent_at IS NULL
-    RETURNING id, student_id
-    `,
-    [studentId]
-  );
-  if (!claimed.rows[0]) return { sent: false, error: "already sent or not shared" };
-
-  const mail = await notifyInvitationShared(studentId, studentRow);
-  if (!mail.sent) {
-    await pool.query(
-      `
-      UPDATE superkandle_members
-      SET invitation_mail_sent_at = NULL, updated_at = NOW()
-      WHERE student_id = $1
-      `,
-      [studentId]
-    );
-  }
-  return mail;
-}
-
-export async function sendDueInvitationSharedMails() {
-  const pending = await pool.query(
-    `
-    SELECT
-      m.id,
-      m.student_id,
-      s.first_name,
-      s.last_name,
-      s.email,
-      s.tradingview_username
-    FROM superkandle_members m
-    JOIN students s ON s.id = m.student_id
-    WHERE m.access_shared = TRUE
-      AND m.invitation_mail_sent_at IS NULL
-    ORDER BY m.id
-    `
-  );
-
-  let sent = 0;
-  for (const row of pending.rows) {
-    const mail = await notifyInvitationSharedOnce(row.student_id, row);
-    if (mail.sent) sent += 1;
-  }
-  return { sent, pending: pending.rows.length };
-}
-
 export async function notifyInvitationFailed(studentId, errorMessage, studentRow = null) {
   const student = await studentForMail(studentId, studentRow);
   const email = String(student?.email || "").trim();
@@ -291,20 +237,4 @@ export function startExpiryMailJob() {
   run();
   const sixHours = 6 * 60 * 60 * 1000;
   setInterval(run, sixHours);
-}
-
-export function startInvitationSharedMailJob() {
-  const run = async () => {
-    try {
-      const result = await sendDueInvitationSharedMails();
-      if (result.sent) {
-        console.log(`Invitation shared mails sent: ${result.sent}`);
-      }
-    } catch (error) {
-      console.error("Invitation shared mail job failed:", error.message);
-    }
-  };
-
-  run();
-  setInterval(run, 15_000);
 }
