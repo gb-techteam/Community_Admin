@@ -1,5 +1,12 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import { loadSettings } from "./portalSettings.js";
+
+const GB_LOGO_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../assets/g-black.png"
+);
 
 export async function smtpReady() {
   const settings = await loadSettings();
@@ -34,12 +41,20 @@ async function sendMail({ to, subject, text, html }) {
     subject,
     text,
     html,
+    attachments: [
+      {
+        filename: "gb-logo.png",
+        path: GB_LOGO_PATH,
+        cid: "gb-logo",
+      },
+    ],
   });
 }
 
 function layout(title, bodyHtml) {
   return `<div style="font-family:Inter,Arial,sans-serif;background:#f4f7fb;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e7edf3;border-radius:16px;padding:24px 28px;color:#1b2430">
+    <img src="cid:gb-logo" alt="Greenbonds" width="36" height="36" style="display:block;margin:0 0 14px;border:0" />
     <p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8b97a3">SuperKandle</p>
     <h1 style="margin:0 0 16px;font-size:22px;font-weight:600">${title}</h1>
     ${bodyHtml}
