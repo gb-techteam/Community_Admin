@@ -9,6 +9,7 @@ import { attachChannelRealtime } from "./realtime/channels.js";
 import authRoutes from "./routes/auth.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import studentRoutes from "./routes/students.js";
+import studentRequestRoutes from "./routes/studentRequests.js";
 import courseRoutes from "./routes/courses.js";
 import batchRoutes from "./routes/batches.js";
 import channelRoutes from "./routes/channels.js";
@@ -18,7 +19,10 @@ import superkandleRoutes from "./routes/superkandle.js";
 import superkandleSubscribeRoutes from "./routes/superkandleSubscribe.js";
 import momentumRoutes from "./routes/momentum.js";
 import settingsRoutes from "./routes/settings.js";
-import { startExpiryMailJob } from "./services/superkandleMails.js";
+import {
+  startExpiryMailJob,
+  startInvitationSharedMailJob,
+} from "./services/superkandleMails.js";
 
 dotenv.config();
 
@@ -73,6 +77,7 @@ async function start() {
 
   attachChannelRealtime(server);
   startExpiryMailJob();
+  startInvitationSharedMailJob();
 
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

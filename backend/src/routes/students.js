@@ -1,6 +1,7 @@
 import express from "express";
 import pool from "../config/db.js";
 import { requireAuth, requirePower } from "../middleware/auth.js";
+import { clearMemberAccessError } from "../services/superkandleAccess.js";
 
 const router = express.Router();
 
@@ -124,6 +125,13 @@ router.put("/:id", async (req, res) => {
       });
     }
 
+    const current = await pool.query(
+      "SELECT tradingview_username FROM students WHERE id = $1",
+      [req.params.id]
+    );
+    const previousTv = String(current.rows[0]?.tradingview_username || "").trim();
+    const nextTv = String(tradingviewUsername || "").trim();
+
     const result = await pool.query(
       `
       UPDATE students
@@ -155,6 +163,10 @@ router.put("/:id", async (req, res) => {
 
     if (!result.rows[0]) {
       return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    if (previousTv !== nextTv) {
+      await clearMemberAccessError(Number(req.params.id));
     }
 
     res.json({ success: true, student: result.rows[0] });

@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { broadcastSuperkandleAccess } from "../realtime/channels.js";
 
 export const DEFAULT_AMOUNT = 8;
 
@@ -58,6 +59,19 @@ export async function markTrialClaimed(studentId) {
     `,
     [studentId]
   );
+}
+
+export async function resetAllTrialClaims() {
+  const result = await pool.query("DELETE FROM superkandle_trial_claims");
+  return result.rowCount || 0;
+}
+
+export async function resetTrialClaim(studentId) {
+  const result = await pool.query(
+    "DELETE FROM superkandle_trial_claims WHERE student_id = $1 RETURNING student_id",
+    [studentId]
+  );
+  return Boolean(result.rows[0]);
 }
 
 export async function markTrialClaimedMany(studentIds) {
@@ -122,4 +136,191 @@ export async function activateMembership({
     ]
   );
   return result.rows[0];
+}
+
+export function isUnknownBatchName(name) {
+  return /i\s*don'?t\s*know/i.test(String(name || ""));
+}
+
+export async function listSelectableBatches() {
+  const result = await pool.query(
+    `
+    SELECT id, name, course_id
+    FROM batches
+    ORDER BY name ASC
+    `
+  );
+  return result.rows.filter((row) => !isUnknownBatchName(row.name));
+}
+
+export async function loadStudentBatches(studentId) {
+  const result = await pool.query(
+    `
+    SELECT b.id, b.name, b.course_id
+    FROM enrollments e
+    JOIN batches b ON b.id = e.batch_id
+    WHERE e.student_id = $1
+    ORDER BY b.name ASC
+    `,
+    [studentId]
+  );
+  return result.rows;
+}
+
+export function studentNeedsBatch(batches) {
+  return !batches.some((row) => !isUnknownBatchName(row.name));
+}
+
+export async function loadPublicStudent(studentId) {
+  const result = await pool.query(
+    `
+    SELECT id, first_name, last_name, email, phone, tradingview_username
+    FROM students
+    WHERE id = $1
+    `,
+    [studentId]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+  const batches = await loadStudentBatches(studentId);
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone || "",
+    tradingviewUsername: row.tradingview_username || "",
+    batches: batches.map((batch) => ({ id: batch.id, name: batch.name })),
+    needsBatch: studentNeedsBatch(batches),
+  };
+}
+
+export async function requireKnownBatch(studentId) {
+  const batches = await loadStudentBatches(studentId);
+  if (!studentNeedsBatch(batches)) return;
+  const error = new Error("Select your batch before continuing");
+  error.status = 400;
+  error.code = "BATCH_REQUIRED";
+  throw error;
+}
+
+export async function assignStudentBatch(studentId, batchId, { force = false } = {}) {
+  const selectable = await listSelectableBatches();
+  const batch = selectable.find((row) => Number(row.id) === Number(batchId));
+  if (!batch?.course_id) {
+    const error = new Error("Select a valid batch");
+    error.status = 400;
+    error.code = "BATCH_REQUIRED";
+    throw error;
+  }
+
+  const current = await loadStudentBatches(studentId);
+  if (!studentNeedsBatch(current) && !force) {
+    return loadPublicStudent(studentId);
+  }
+
+  if (!studentNeedsBatch(current) && force) {
+    await pool.query(
+      `
+      UPDATE enrollments
+      SET batch_id = $1, course_id = $2, updated_at = NOW()
+      WHERE id = (
+        SELECT id
+        FROM enrollments
+        WHERE student_id = $3
+        ORDER BY updated_at DESC NULLS LAST, id DESC
+        LIMIT 1
+      )
+      `,
+      [batch.id, batch.course_id, studentId]
+    );
+    return loadPublicStudent(studentId);
+  }
+
+  const updated = await pool.query(
+    `
+    UPDATE enrollments
+    SET
+      batch_id = $1,
+      course_id = $2,
+      updated_at = NOW()
+    WHERE student_id = $3
+      AND (
+        batch_id IS NULL
+        OR batch_id IN (
+          SELECT id
+          FROM batches
+          WHERE name ILIKE '%dont know%'
+             OR name ILIKE '%don''t know%'
+        )
+      )
+    `,
+    [batch.id, batch.course_id, studentId]
+  );
+
+  if (!updated.rowCount) {
+    await pool.query(
+      `
+      INSERT INTO enrollments (
+        student_id,
+        course_id,
+        batch_id,
+        status,
+        payment_status
+      )
+      VALUES ($1, $2, $3, 'active', 'pending')
+      `,
+      [studentId, batch.course_id, batch.id]
+    );
+  }
+
+  return loadPublicStudent(studentId);
+}
+
+export async function clearMemberAccessError(studentId) {
+  const result = await pool.query(
+    `
+    UPDATE superkandle_members
+    SET
+      access_error = FALSE,
+      access_error_message = '',
+      updated_at = NOW()
+    WHERE student_id = $1
+      AND access_error = TRUE
+    RETURNING id, student_id
+    `,
+    [studentId]
+  );
+
+  for (const row of result.rows) {
+    broadcastSuperkandleAccess({
+      id: row.id,
+      student_id: row.student_id,
+      access_error: false,
+      access_error_message: "",
+      error: false,
+      errorMessage: "",
+    });
+  }
+
+  return result.rowCount || 0;
+}
+
+export async function saveTradingviewUsername(studentId, username) {
+  const value = String(username || "").trim();
+  if (!value) {
+    const error = new Error("TradingView ID is required");
+    error.status = 400;
+    throw error;
+  }
+  await pool.query(
+    `
+    UPDATE students
+    SET tradingview_username = $1, updated_at = NOW()
+    WHERE id = $2
+    `,
+    [value, studentId]
+  );
+  await clearMemberAccessError(studentId);
+  return loadPublicStudent(studentId);
 }

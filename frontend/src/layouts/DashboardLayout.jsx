@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Users,
   BookOpen,
+  ClipboardList,
   Layers,
   Megaphone,
   Shield,

@@ -11,11 +11,17 @@ import {
 } from "../services/bscUsdt.js";
 import {
   activateMembership,
+  assignStudentBatch,
   effectivePlanPrice,
   hasUsedTrial,
+  listSelectableBatches,
+  loadPublicStudent,
   markTrialClaimed,
+  requireKnownBatch,
+  saveTradingviewUsername,
 } from "../services/superkandleAccess.js";
-import { notifyMembershipActivated } from "../services/superkandleMails.js";
+import { notifyMembershipActivatedOnce } from "../services/superkandleMails.js";
+import { loadSettings } from "../services/portalSettings.js";
 
 const router = express.Router();
 
@@ -86,13 +92,16 @@ async function membershipFor(studentId) {
   return result.rows[0] || null;
 }
 
-function publicStudent(row) {
-  return {
-    id: row.id,
-    firstName: row.first_name,
-    lastName: row.last_name,
-    email: row.email,
-  };
+function httpError(res, error, fallback) {
+  if (error.status) {
+    return res.status(error.status).json({
+      success: false,
+      code: error.code,
+      message: error.message,
+    });
+  }
+  console.error(fallback, error.message);
+  return res.status(500).json({ success: false, message: fallback });
 }
 
 router.post("/request-otp", async (req, res) => {
@@ -107,9 +116,11 @@ router.post("/request-otp", async (req, res) => {
 
     const student = await findStudentByEmail(email);
     if (!student) {
-      return res.status(403).json({
+      return res.status(404).json({
         success: false,
-        message: "This link is only for enrolled students. Email not found.",
+        code: "EMAIL_NOT_FOUND",
+        message:
+          "This email is not in the students list. Please confirm you entered the exact academy email, or fill the request form.",
       });
     }
 
@@ -228,7 +239,7 @@ router.post("/verify", async (req, res) => {
     res.json({
       success: true,
       token,
-      student: publicStudent(student),
+      student: await loadPublicStudent(student.id),
     });
   } catch (error) {
     console.error("Subscribe verify error:", error.message);
@@ -239,13 +250,23 @@ router.post("/verify", async (req, res) => {
   }
 });
 
+router.get("/batches", async (_req, res) => {
+  try {
+    const batches = await listSelectableBatches();
+    res.json({
+      success: true,
+      batches: batches.map((batch) => ({ id: batch.id, name: batch.name })),
+    });
+  } catch (error) {
+    console.error("Subscribe batches error:", error.message);
+    res.status(500).json({ success: false, message: "Failed to load batches" });
+  }
+});
+
 router.get("/session", requireStudent, async (req, res) => {
   try {
-    const student = await pool.query(
-      "SELECT id, first_name, last_name, email, phone FROM students WHERE id = $1",
-      [req.student.studentId]
-    );
-    if (!student.rows[0]) {
+    const student = await loadPublicStudent(req.student.studentId);
+    if (!student) {
       return res.status(404).json({ success: false, message: "Student not found" });
     }
 
@@ -254,7 +275,7 @@ router.get("/session", requireStudent, async (req, res) => {
 
     res.json({
       success: true,
-      student: publicStudent(student.rows[0]),
+      student,
       trialUsed,
       membership,
       payment: {
@@ -270,9 +291,33 @@ router.get("/session", requireStudent, async (req, res) => {
   }
 });
 
+router.patch("/profile", requireStudent, async (req, res) => {
+  try {
+    const studentId = req.student.studentId;
+    if (req.body.batchId != null && req.body.batchId !== "") {
+      await assignStudentBatch(studentId, req.body.batchId, {
+        force: Boolean(req.body.confirmBatch),
+      });
+    }
+    if (req.body.tradingviewUsername != null) {
+      await saveTradingviewUsername(studentId, req.body.tradingviewUsername);
+    }
+    const student = await loadPublicStudent(studentId);
+    if (req.body.confirmBatch) {
+      await notifyMembershipActivatedOnce(studentId);
+    }
+    res.json({ success: true, student });
+  } catch (error) {
+    httpError(res, error, "Could not save details");
+  }
+});
+
 router.get("/plans", requireStudent, async (req, res) => {
   try {
+    await requireKnownBatch(req.student.studentId);
     const trialUsed = await hasUsedTrial(req.student.studentId);
+    const settings = await loadSettings();
+    const displayPricedPlans = settings.displayPricedPlans !== false;
     const result = await pool.query(
       `
       SELECT
@@ -290,6 +335,10 @@ router.get("/plans", requireStudent, async (req, res) => {
           p.is_trial = FALSE
           OR $1 = FALSE
         )
+        AND (
+          $2 = TRUE
+          OR p.is_trial = TRUE
+        )
       ORDER BY
         p.is_trial DESC,
         p.is_default DESC,
@@ -301,18 +350,23 @@ router.get("/plans", requireStudent, async (req, res) => {
         COALESCE(p.duration_value, p.duration_months, 1) ASC,
         p.id ASC
       `,
-      [trialUsed]
+      [trialUsed, displayPricedPlans]
     );
+
+    const plans = result.rows.map((plan) => ({
+      ...plan,
+      price: effectivePlanPrice(plan),
+    }));
 
     res.json({
       success: true,
       trialUsed,
-      plans: result.rows.map((plan) => ({
-        ...plan,
-        price: effectivePlanPrice(plan),
-      })),
+      displayPricedPlans,
+      hasOffer: plans.length > 0,
+      plans,
     });
   } catch (error) {
+    if (error.status) return httpError(res, error, "Failed to load plans");
     console.error("Subscribe plans error:", error.message);
     res.status(500).json({ success: false, message: "Failed to load plans" });
   }
@@ -329,6 +383,14 @@ router.post("/start", requireStudent, async (req, res) => {
     }
 
     const studentId = req.student.studentId;
+    await requireKnownBatch(studentId);
+    const settings = await loadSettings();
+    if (!plan.is_trial && settings.displayPricedPlans === false) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have any offer for taking SuperKandle",
+      });
+    }
     const trialUsed = await hasUsedTrial(studentId);
 
     if (plan.is_trial) {
@@ -348,17 +410,6 @@ router.post("/start", requireStudent, async (req, res) => {
         paymentMethod: "free_trial",
         paymentNote: "Student self-serve free trial",
       });
-      await notifyMembershipActivated({
-        studentId,
-        planName: plan.name,
-        expiresAt: membership?.expires_at,
-        kind: "trial",
-        amount: 0,
-        durationValue: plan.duration_value,
-        durationUnit: plan.duration_unit,
-        paymentMethod: "free_trial",
-      });
-
       return res.json({
         success: true,
         kind: "trial",
@@ -416,6 +467,7 @@ router.post("/start", requireStudent, async (req, res) => {
       },
     });
   } catch (error) {
+    if (error.status) return httpError(res, error, "Could not start checkout");
     console.error("Subscribe start error:", error.message);
     res.status(500).json({
       success: false,
@@ -453,6 +505,14 @@ router.post("/confirm", requireStudent, async (req, res) => {
     const paymentId = Number(req.body.paymentId);
     const txHash = String(req.body.txHash || "").trim();
     const studentId = req.student.studentId;
+    await requireKnownBatch(studentId);
+    const settings = await loadSettings();
+    if (settings.displayPricedPlans === false) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have any offer for taking SuperKandle",
+      });
+    }
 
     if (!Number.isFinite(paymentId)) {
       return res.status(400).json({
@@ -524,17 +584,6 @@ router.post("/confirm", requireStudent, async (req, res) => {
       paymentMethod: "USDT-BEP20",
       paymentNote: `tx ${txHash}`,
     });
-    await notifyMembershipActivated({
-      studentId,
-      planName: order.plan_name,
-      expiresAt: membership?.expires_at,
-      kind: "paid",
-      amount: Number(order.amount),
-      durationValue: order.duration_value,
-      durationUnit: order.duration_unit,
-      paymentMethod: "USDT-BEP20",
-    });
-
     res.json({
       success: true,
       membership: await membershipFor(studentId),
@@ -547,10 +596,128 @@ router.post("/confirm", requireStudent, async (req, res) => {
         message: "This transaction was already used",
       });
     }
+    if (error.status) {
+      return httpError(res, error, "Could not confirm payment. Try again in a minute.");
+    }
     console.error("Subscribe confirm error:", error.message);
     res.status(500).json({
       success: false,
       message: "Could not confirm payment. Try again in a minute.",
+    });
+  }
+});
+
+router.post("/access-request", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const firstName = String(req.body.firstName || "").trim();
+    const lastName = String(req.body.lastName || "").trim();
+    const phone = String(req.body.phone || "").trim();
+    const address = String(req.body.address || "").trim();
+    const dateOfBirth = String(req.body.dateOfBirth || "").trim();
+    const telegramUser = String(req.body.telegramUser || "").trim();
+    const tradingviewUsername = String(req.body.tradingviewUsername || "").trim();
+    const note = String(req.body.note || "").trim();
+    const batchId = Number(req.body.batchId);
+
+    if (
+      !email ||
+      !firstName ||
+      !lastName ||
+      !phone ||
+      !address ||
+      !dateOfBirth ||
+      !telegramUser ||
+      !tradingviewUsername ||
+      !note ||
+      !Number.isFinite(batchId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Every field is required, including batch",
+      });
+    }
+
+    const selectable = await listSelectableBatches();
+    const batch = selectable.find((row) => Number(row.id) === batchId);
+    if (!batch) {
+      return res.status(400).json({
+        success: false,
+        message: "Select a valid batch",
+      });
+    }
+
+    const existingStudent = await findStudentByEmail(email);
+    if (existingStudent) {
+      return res.status(409).json({
+        success: false,
+        code: "ALREADY_STUDENT",
+        message:
+          "This email is already in the students list. Go back and request the OTP.",
+      });
+    }
+
+    const pending = await pool.query(
+      `
+      SELECT id
+      FROM superkandle_access_requests
+      WHERE LOWER(TRIM(email)) = $1 AND status = 'pending'
+      LIMIT 1
+      `,
+      [email]
+    );
+    if (pending.rows[0]) {
+      return res.json({
+        success: true,
+        alreadySubmitted: true,
+        message:
+          "A request for this email is already waiting for academy review.",
+      });
+    }
+
+    const created = await pool.query(
+      `
+      INSERT INTO superkandle_access_requests (
+        email,
+        first_name,
+        last_name,
+        phone,
+        address,
+        date_of_birth,
+        telegram_user,
+        tradingview_username,
+        note,
+        batch_id,
+        status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
+      RETURNING id
+      `,
+      [
+        email,
+        firstName,
+        lastName,
+        phone,
+        address,
+        dateOfBirth,
+        telegramUser,
+        tradingviewUsername,
+        note,
+        batch.id,
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      requestId: created.rows[0].id,
+      message:
+        "Request submitted. The academy will review it and you can use this email after approval.",
+    });
+  } catch (error) {
+    console.error("Subscribe access request error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Could not submit the request. Try again.",
     });
   }
 });

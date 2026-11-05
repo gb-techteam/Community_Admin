@@ -460,6 +460,14 @@ export async function ensureSuperkandleSchema() {
     ALTER TABLE superkandle_members
     ADD COLUMN IF NOT EXISTS access_error_message TEXT NOT NULL DEFAULT ''
   `);
+  await pool.query(`
+    ALTER TABLE superkandle_members
+    ADD COLUMN IF NOT EXISTS activation_mail_sent_at TIMESTAMPTZ
+  `);
+  await pool.query(`
+    ALTER TABLE superkandle_members
+    ADD COLUMN IF NOT EXISTS invitation_mail_sent_at TIMESTAMPTZ
+  `);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_superkandle_members_expires_at
@@ -520,6 +528,43 @@ export async function ensureSuperkandleSchema() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_superkandle_payments_tx_hash
     ON superkandle_payments (tx_hash)
     WHERE tx_hash IS NOT NULL
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS superkandle_access_requests (
+      id SERIAL PRIMARY KEY,
+      email VARCHAR(255) NOT NULL,
+      first_name VARCHAR(120) NOT NULL,
+      last_name VARCHAR(120),
+      phone VARCHAR(40),
+      address TEXT,
+      date_of_birth DATE,
+      telegram_user VARCHAR(120),
+      tradingview_username VARCHAR(120),
+      note TEXT,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      reviewed_at TIMESTAMPTZ,
+      reviewed_by VARCHAR(150),
+      review_note TEXT,
+      student_id INTEGER REFERENCES students(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE superkandle_access_requests
+    ADD COLUMN IF NOT EXISTS batch_id INTEGER REFERENCES batches(id) ON DELETE SET NULL
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_sk_access_requests_status
+    ON superkandle_access_requests (status, created_at DESC)
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_sk_access_requests_email
+    ON superkandle_access_requests (email)
   `);
 
   await pool.query(`

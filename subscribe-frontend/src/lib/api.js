@@ -16,7 +16,10 @@ export async function studentApi(path, { token, ...options } = {}) {
   );
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.success === false) {
-    throw new Error(data.message || "Request failed");
+    const error = new Error(data.message || "Request failed");
+    error.code = data.code;
+    error.status = response.status;
+    throw error;
   }
   return data;
 }

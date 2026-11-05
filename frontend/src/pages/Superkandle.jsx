@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AlertTriangle,
   BadgeDollarSign,
   Ban,
   Check,
@@ -11,12 +12,14 @@ import {
   Eye,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   Users,
   UserCheck,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { connectSuperkandleSocket } from "../lib/superkandleSocket";
 import { useFeedback } from "../lib/feedback";
 import { EntityCell, MetricCell } from "../components/TableCells";
 import SuperkandleMemberModal from "../components/SuperkandleMemberModal";
@@ -61,6 +64,16 @@ function paymentMethodLabel(method) {
   return value;
 }
 
+function hasAccessError(member) {
+  return Boolean(member?.error ?? member?.access_error);
+}
+
+function accessErrorMessage(member) {
+  return String(
+    member?.errorMessage ?? member?.access_error_message ?? ""
+  ).trim();
+}
+
 function durationLabel(value, unit = "month") {
   const n = Number(value) || 1;
   const u = String(unit || "month").toLowerCase();
@@ -103,10 +116,14 @@ export default function Superkandle() {
     status = statusFilter,
     expiry = expiryFilter,
     payment = paymentFilter,
-    accessShared = sharedFilter
+    accessShared = sharedFilter,
+    options = {}
   ) {
-    setLoading(true);
-    setError("");
+    const silent = options.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set("search", query.trim());
@@ -123,13 +140,45 @@ export default function Superkandle() {
       setStats(data.stats || stats);
       setViewingMember((current) => {
         if (!current) return current;
-        return nextMembers.find((row) => row.id === current.id) || current;
+        return (
+          nextMembers.find((row) => Number(row.id) === Number(current.id)) ||
+          current
+        );
       });
     } catch (err) {
-      setError(err.message);
+      if (!silent) setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
+  }
+
+  const loadRef = useRef(loadMembers);
+  loadRef.current = loadMembers;
+  const filtersRef = useRef({
+    search,
+    statusFilter,
+    expiryFilter,
+    paymentFilter,
+    sharedFilter,
+  });
+  filtersRef.current = {
+    search,
+    statusFilter,
+    expiryFilter,
+    paymentFilter,
+    sharedFilter,
+  };
+
+  function refreshMembersSilent() {
+    const q = filtersRef.current;
+    loadRef.current(
+      q.search,
+      q.statusFilter,
+      q.expiryFilter,
+      q.paymentFilter,
+      q.sharedFilter,
+      { silent: true }
+    );
   }
 
   useEffect(() => {
@@ -137,6 +186,29 @@ export default function Superkandle() {
     api("/api/superkandle/checkout-settings")
       .then(setCheckout)
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const stopSocket = connectSuperkandleSocket((event) => {
+      const member = event?.member;
+      if (member?.id) {
+        const id = Number(member.id);
+        setMembers((rows) =>
+          rows.map((row) =>
+            Number(row.id) === id ? { ...row, ...member } : row
+          )
+        );
+        setViewingMember((current) =>
+          Number(current?.id) === id ? { ...current, ...member } : current
+        );
+      }
+      refreshMembersSilent();
+    });
+    const timer = setInterval(refreshMembersSilent, 4000);
+    return () => {
+      stopSocket();
+      clearInterval(timer);
+    };
   }, []);
 
   async function copySubscribeLink() {
@@ -185,19 +257,23 @@ export default function Superkandle() {
     if (!ok) return;
 
     try {
-      await api(`/api/superkandle/${member.id}/access-shared`, {
+      const data = await api(`/api/superkandle/${member.id}/access-shared`, {
         method: "PATCH",
-        body: JSON.stringify({
-          accessShared,
-          error: false,
-          errorMessage: "",
-        }),
+        body: JSON.stringify(
+          accessShared
+            ? { accessShared: true, error: false, errorMessage: "" }
+            : { accessShared: false, unmark: true }
+        ),
       });
       await loadMembers();
       notify({
         title: accessShared ? "Access marked shared" : "Access unmarked",
         message: accessShared
-          ? "This subscription is marked as invite/access shared."
+          ? data.mailSent
+            ? "Invite marked shared and the student was emailed."
+            : `Invite marked shared, but the email did not send${
+                data.mailError ? `: ${data.mailError}` : ""
+              }.`
           : "This subscription is waiting for access to be shared.",
       });
     } catch (err) {
@@ -272,6 +348,40 @@ export default function Superkandle() {
   function closeModal() {
     setShowModal(false);
     setEditingMember(null);
+  }
+
+  async function handleResetTrial(member) {
+    const name = fullName(member.first_name, member.last_name);
+    const ok = await confirm({
+      title: "Reset this student's free trial?",
+      message: `${name} will be able to take the SuperKandle free trial again.`,
+      confirmLabel: "Reset trial",
+      tone: "info",
+    });
+    if (!ok) return;
+    try {
+      const data = await api(`/api/superkandle/${member.id}/reset-trial`, {
+        method: "POST",
+      });
+      if (data.member) {
+        setMembers((rows) =>
+          rows.map((row) =>
+            Number(row.id) === Number(member.id) ? { ...row, ...data.member } : row
+          )
+        );
+        setViewingMember((current) =>
+          current && Number(current.id) === Number(member.id)
+            ? { ...current, ...data.member }
+            : current
+        );
+      }
+      notify({
+        title: "Trial reset",
+        message: data.message || "This student can take the free trial again.",
+      });
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function handleDelete(id) {
@@ -490,6 +600,17 @@ export default function Superkandle() {
             </div>
           </div>
 
+          {hasAccessError(viewingMember) ? (
+            <p className="sk-view-error">
+              <AlertTriangle size={16} strokeWidth={2} aria-hidden="true" />
+              <span>
+                <strong>Share error</strong>
+                {accessErrorMessage(viewingMember) ||
+                  "TradingView invite could not be shared."}
+              </span>
+            </p>
+          ) : null}
+
           <dl className="student-detail__dl">
             <div className="student-detail__item">
               <dt>Email</dt>
@@ -541,6 +662,10 @@ export default function Superkandle() {
               <dt>Access</dt>
               <dd>{viewingMember.is_active ? "Active" : "Inactive"}</dd>
             </div>
+            <div className="student-detail__item">
+              <dt>Free trial</dt>
+              <dd>{viewingMember.trial_used ? "Used" : "Available"}</dd>
+            </div>
             {viewingMember.payment_note ? (
               <div className="student-detail__item student-detail__item--span">
                 <dt>Note</dt>
@@ -548,6 +673,16 @@ export default function Superkandle() {
               </div>
             ) : null}
           </dl>
+          <div className="entity-form__actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => handleResetTrial(viewingMember)}
+            >
+              <RotateCcw size={16} strokeWidth={2} aria-hidden="true" />
+              Reset this student's trial
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -837,14 +972,33 @@ export default function Superkandle() {
                     </td>
                     <td className="sk-col-invite">
                       <div className="sk-invite-cell">
-                        <span
-                          className={`sk-pill ${
-                            member.access_shared
-                              ? "sk-pill--active"
-                              : "sk-pill--pending"
-                          }`}
-                        >
-                          {member.access_shared ? "Shared" : "Not shared"}
+                        <span className="sk-invite-status">
+                          {hasAccessError(member) ? (
+                            <span
+                              className="sk-error-flag"
+                              title={
+                                accessErrorMessage(member) ||
+                                "TradingView invite failed"
+                              }
+                            >
+                              <AlertTriangle size={14} strokeWidth={2} />
+                            </span>
+                          ) : null}
+                          <span
+                            className={`sk-pill ${
+                              hasAccessError(member)
+                                ? "sk-pill--expired"
+                                : member.access_shared
+                                  ? "sk-pill--active"
+                                  : "sk-pill--pending"
+                            }`}
+                          >
+                            {hasAccessError(member)
+                              ? "Error"
+                              : member.access_shared
+                                ? "Shared"
+                                : "Not shared"}
+                          </span>
                         </span>
                         <button
                           type="button"
@@ -866,6 +1020,15 @@ export default function Superkandle() {
                         >
                           <Eye size={14} strokeWidth={2} aria-hidden="true" />
                           View
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() => handleResetTrial(member)}
+                          title="Reset this student's free trial"
+                        >
+                          <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
+                          Reset trial
                         </button>
                         <button
                           type="button"

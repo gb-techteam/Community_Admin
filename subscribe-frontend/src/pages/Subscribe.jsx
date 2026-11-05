@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import {
   Check,
+  Clock3,
   Copy,
   Gift,
   KeyRound,
   ShieldCheck,
+  Sparkles,
   Wallet,
 } from "lucide-react";
 import { studentApi } from "../lib/api";
@@ -76,6 +78,64 @@ function moneyUsdt(value, digits = 2) {
   return `${n.toFixed(digits)} USDT`;
 }
 
+function batchKindOf(name) {
+  const text = String(name || "").toLowerCase();
+  if (/\bgcc\b/.test(text)) return "gcc";
+  if (/\bonline\b/.test(text)) return "online";
+  if (/\boffline\b/.test(text)) return "offline";
+  return "";
+}
+
+function batchesForKind(batches, kind) {
+  return batches.filter((batch) => batchKindOf(batch.name) === kind);
+}
+
+function BatchSelect({
+  id,
+  kind,
+  batchId,
+  batches,
+  onKindChange,
+  onBatchChange,
+}) {
+  const options = kind ? batchesForKind(batches, kind) : [];
+
+  return (
+    <>
+      <label htmlFor={`${id}Kind`}>Batch type</label>
+      <select
+        id={`${id}Kind`}
+        value={kind}
+        onChange={(e) => onKindChange(e.target.value)}
+        required
+      >
+        <option value="">Select GCC, Online, or Offline</option>
+        <option value="gcc">GCC</option>
+        <option value="online">Online</option>
+        <option value="offline">Offline</option>
+      </select>
+      {kind ? (
+        <>
+          <label htmlFor={id}>Batch</label>
+          <select
+            id={id}
+            value={batchId}
+            onChange={(e) => onBatchChange(e.target.value)}
+            required
+          >
+            <option value="">Select your batch</option>
+            {options.map((batch) => (
+              <option key={batch.id} value={batch.id}>
+                {batch.name}
+              </option>
+            ))}
+          </select>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 export default function Subscribe() {
   const [step, setStep] = useState("email");
   const [email, setEmail] = useState("");
@@ -84,12 +144,38 @@ export default function Subscribe() {
   const [student, setStudent] = useState(null);
   const [plans, setPlans] = useState([]);
   const [trialUsed, setTrialUsed] = useState(false);
+  const [displayPricedPlans, setDisplayPricedPlans] = useState(true);
   const [membership, setMembership] = useState(null);
   const [checkout, setCheckout] = useState(null);
   const [txHash, setTxHash] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState("");
+  const [showMissing, setShowMissing] = useState(false);
+  const [requestForm, setRequestForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    address: "",
+    dateOfBirth: "",
+    telegramUser: "",
+    tradingviewUsername: "",
+    note: "",
+    batchId: "",
+  });
+  const [requestDone, setRequestDone] = useState("");
+  const [batches, setBatches] = useState([]);
+  const [batchId, setBatchId] = useState("");
+  const [batchKind, setBatchKind] = useState("");
+  const [requestBatchKind, setRequestBatchKind] = useState("");
+  const [tvDraft, setTvDraft] = useState("");
+  const [tvConfirmed, setTvConfirmed] = useState(false);
+
+  useEffect(() => {
+    studentApi("/batches")
+      .then((data) => setBatches(data.batches || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const saved = sessionStorage.getItem(TOKEN_KEY);
@@ -98,18 +184,39 @@ export default function Subscribe() {
       try {
         const data = await studentApi("/session", { token: saved });
         setToken(saved);
-        setStudent(data.student);
-        setTrialUsed(data.trialUsed);
-        setMembership(data.membership);
-        const planData = await studentApi("/plans", { token: saved });
-        setPlans(planData.plans || []);
-        setTrialUsed(planData.trialUsed);
-        setStep("plans");
+        await enterAuthenticated(saved, data.student, data);
       } catch {
         sessionStorage.removeItem(TOKEN_KEY);
       }
     })();
   }, []);
+
+  async function enterAuthenticated(saved, nextStudent, extra = {}) {
+    setStudent(nextStudent);
+    setTvDraft(nextStudent?.tradingviewUsername || "");
+    setTvConfirmed(false);
+    prefillConfirm(nextStudent);
+    if (nextStudent?.needsBatch) {
+      const known = (nextStudent.batches || []).find(
+        (row) => !/i\s*don'?t\s*know/i.test(row.name || "")
+      );
+      setBatchId(known?.id ? String(known.id) : "");
+      setStep("batch");
+      return;
+    }
+    const planData = await studentApi("/plans", { token: saved });
+    setPlans(planData.plans || []);
+    setTrialUsed(extra.trialUsed ?? planData.trialUsed);
+    setDisplayPricedPlans(planData.displayPricedPlans !== false);
+    if (extra.membership !== undefined) {
+      setMembership(extra.membership);
+    } else {
+      const session = await studentApi("/session", { token: saved });
+      setMembership(session.membership);
+      setTrialUsed(session.trialUsed);
+    }
+    setStep("plans");
+  }
 
   async function requestCode(event) {
     event.preventDefault();
@@ -121,6 +228,36 @@ export default function Subscribe() {
         body: JSON.stringify({ email }),
       });
       setStep("code");
+    } catch (err) {
+      if (err.code === "EMAIL_NOT_FOUND") {
+        setShowMissing(true);
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function updateRequest(field, value) {
+    setRequestForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function submitRequest(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const data = await studentApi("/access-request", {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          ...requestForm,
+          batchId: Number(requestForm.batchId),
+        }),
+      });
+      setRequestDone(data.message);
+      setStep("request-done");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -139,13 +276,74 @@ export default function Subscribe() {
       });
       sessionStorage.setItem(TOKEN_KEY, data.token);
       setToken(data.token);
+      await enterAuthenticated(data.token, data.student);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function prefillConfirm(nextStudent) {
+    const known = (nextStudent?.batches || []).find(
+      (row) => !/i\s*don'?t\s*know/i.test(row.name || "")
+    );
+    setTvDraft(nextStudent?.tradingviewUsername || "");
+    if (known) {
+      setBatchId(String(known.id));
+      setBatchKind(batchKindOf(known.name));
+    } else {
+      setBatchId("");
+      setBatchKind("");
+    }
+  }
+
+  function goToConfirm(nextStudent = student) {
+    prefillConfirm(nextStudent);
+    setTvConfirmed(false);
+    setStep("confirm");
+  }
+
+  async function saveBatch(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const data = await studentApi("/profile", {
+        token,
+        method: "PATCH",
+        body: JSON.stringify({ batchId: Number(batchId) }),
+      });
+      await enterAuthenticated(token, data.student);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDetails(event) {
+    event.preventDefault();
+    if (!batchId) {
+      setError("Select your batch before continuing.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const data = await studentApi("/profile", {
+        token,
+        method: "PATCH",
+        body: JSON.stringify({
+          batchId: Number(batchId),
+          tradingviewUsername: tvDraft,
+          confirmBatch: true,
+        }),
+      });
       setStudent(data.student);
-      const planData = await studentApi("/plans", { token: data.token });
-      setPlans(planData.plans || []);
-      setTrialUsed(planData.trialUsed);
-      const session = await studentApi("/session", { token: data.token });
-      setMembership(session.membership);
-      setStep("plans");
+      setTvDraft(data.student.tradingviewUsername || tvDraft);
+      setTvConfirmed(true);
+      setStep("done");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -154,6 +352,11 @@ export default function Subscribe() {
   }
 
   async function choosePlan(plan) {
+    if (student?.needsBatch) {
+      setError("Select your batch before continuing.");
+      setStep("batch");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -166,7 +369,7 @@ export default function Subscribe() {
         setMembership(data.membership);
         setTrialUsed(true);
         setPlans((current) => current.filter((row) => !row.is_trial));
-        setStep("done");
+        goToConfirm(student);
         return;
       }
       setCheckout(data);
@@ -192,7 +395,7 @@ export default function Subscribe() {
         }),
       });
       setMembership(data.membership);
-      setStep("done");
+      goToConfirm(student);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -286,51 +489,121 @@ export default function Subscribe() {
           </form>
         ) : null}
 
+        {step === "batch" ? (
+          <>
+            <p className="sk-crumb">
+              Hi {student?.firstName || "there"} · {student?.email}
+            </p>
+            <h1>Select your batch</h1>
+            <p className="sk-sub__lead">
+              Your profile is on “I don&apos;t know my batch name”. Choose your
+              real batch before you can take a trial or pay.
+            </p>
+            <form className="sk-sub__form" onSubmit={saveBatch}>
+              <BatchSelect
+                id="studentBatch"
+                kind={batchKind}
+                batchId={batchId}
+                batches={batches}
+                onKindChange={(next) => {
+                  setBatchKind(next);
+                  setBatchId("");
+                }}
+                onBatchChange={setBatchId}
+              />
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={busy || !batchId}
+              >
+                {busy ? "Saving…" : "Save batch and continue"}
+              </button>
+            </form>
+          </>
+        ) : null}
+
         {step === "plans" ? (
           <>
             <p className="sk-crumb">
               Hi {student?.firstName || "there"} · {student?.email}
             </p>
-            <h1>Choose a plan</h1>
+            <h1>
+              {!plans.length
+                ? "No offer right now"
+                : !displayPricedPlans
+                  ? "Start with a free trial"
+                  : "Choose a plan"}
+            </h1>
             <p className="sk-sub__lead">
-              {trialUsed
-                ? "Your free trial is already used. Pick a paid USDT plan."
-                : "You can start with one free trial, or pay with USDT (BEP20)."}
+              {!plans.length
+                ? "You don't have any offer for taking SuperKandle."
+                : !displayPricedPlans
+                  ? "Take the free trial now. Paid SuperKandle plans will open shortly."
+                  : trialUsed
+                    ? "Your free trial is already used. Pick a paid USDT plan."
+                    : "You can start with one free trial, or pay with USDT (BEP20)."}
             </p>
             {membership?.is_active && membership.expiry_state !== "expired" ? (
               <p className="sk-sub__note">
                 Current access: {membership.plan_name || "Active"} until{" "}
                 {String(membership.expires_at || "").slice(0, 10) || "—"}.
-                Paying again renews from today.
+                {displayPricedPlans ? " Paying again renews from today." : ""}
               </p>
             ) : null}
-            <div className="sk-sub__plans">
-              {plans.map((plan) => (
-                <button
-                  key={plan.id}
-                  type="button"
-                  className={`sk-sub__plan ${
-                    plan.is_trial ? "is-trial" : ""
-                  }`}
-                  disabled={busy}
-                  onClick={() => choosePlan(plan)}
-                >
-                  {plan.is_trial ? (
-                    <span className="sk-sub__badge">
-                      <Gift size={12} /> Free trial
+            {plans.length ? (
+              <div
+                className={`sk-sub__plans ${
+                  !displayPricedPlans ? "sk-sub__plans--offer" : ""
+                }`}
+              >
+                {plans.map((plan) => (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    className={`sk-sub__plan ${
+                      plan.is_trial ? "is-trial" : ""
+                    }`}
+                    disabled={busy}
+                    onClick={() => choosePlan(plan)}
+                  >
+                    {plan.is_trial ? (
+                      <span className="sk-sub__badge">
+                        <Gift size={12} /> Free trial
+                      </span>
+                    ) : null}
+                    <strong>{plan.name}</strong>
+                    <em>{moneyUsdt(plan.price)}</em>
+                    <span>
+                      {durationLabel(plan.duration_value, plan.duration_unit)}
                     </span>
-                  ) : null}
-                  <strong>{plan.name}</strong>
-                  <em>{moneyUsdt(plan.price)}</em>
-                  <span>
-                    {durationLabel(plan.duration_value, plan.duration_unit)}
-                  </span>
-                </button>
-              ))}
-            </div>
-            {!plans.length ? (
-              <p className="sk-sub__note">No plans are available right now.</p>
-            ) : null}
+                    {plan.is_trial ? (
+                      <b className="sk-sub__plan-cta">Start free trial</b>
+                    ) : null}
+                  </button>
+                ))}
+                {!displayPricedPlans ? (
+                  <div className="sk-sub__plan sk-sub__plan--soon">
+                    <span className="sk-sub__badge sk-sub__badge--soon">
+                      <Clock3 size={12} /> Coming soon
+                    </span>
+                    <strong>Paid plans</strong>
+                    <em>Soon</em>
+                    <span>Other priced plans will be coming soon.</span>
+                    <b className="sk-sub__plan-cta is-muted">
+                      <Sparkles size={14} /> Stay tuned
+                    </b>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="sk-sub__empty">
+                <Sparkles size={22} strokeWidth={2} />
+                <strong>No SuperKandle offer yet</strong>
+                <span>
+                  Check back later, or ask the academy when the next plan opens.
+                </span>
+              </div>
+            )}
           </>
         ) : null}
 
@@ -405,6 +678,47 @@ export default function Subscribe() {
           </>
         ) : null}
 
+        {step === "confirm" ? (
+          <>
+            <p className="sk-crumb">
+              Hi {student?.firstName || "there"} · {student?.email}
+            </p>
+            <h1>Confirm your details</h1>
+            <p className="sk-sub__lead">
+              Check your batch and TradingView ID before we share the invite.
+              Access is not shown as ready until these are confirmed.
+            </p>
+            <form className="sk-sub__form" onSubmit={confirmDetails}>
+              <BatchSelect
+                id="confirmBatch"
+                kind={batchKind}
+                batchId={batchId}
+                batches={batches}
+                onKindChange={(next) => {
+                  setBatchKind(next);
+                  setBatchId("");
+                }}
+                onBatchChange={setBatchId}
+              />
+              <label htmlFor="confirmTv">TradingView ID</label>
+              <input
+                id="confirmTv"
+                value={tvDraft}
+                onChange={(e) => setTvDraft(e.target.value)}
+                placeholder="TradingView username"
+                required
+              />
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={busy || !batchId || !tvDraft.trim()}
+              >
+                {busy ? "Saving…" : "Confirm and continue"}
+              </button>
+            </form>
+          </>
+        ) : null}
+
         {step === "done" ? (
           <div className="sk-sub__done">
             <span className="sk-sub__done-icon" aria-hidden="true">
@@ -416,13 +730,172 @@ export default function Subscribe() {
               {membership?.expires_at
                 ? ` until ${String(membership.expires_at).slice(0, 10)}`
                 : ""}
-              .
+              . The TradingView invitation will be shared within 1–2 hours.
             </p>
+            <p className="sk-sub__note">
+              Invite will go to TradingView ID{" "}
+              <strong>{student?.tradingviewUsername || tvDraft}</strong>.
+            </p>
+          </div>
+        ) : null}
+
+        {step === "request" ? (
+          <>
+            <p className="sk-crumb">Access request</p>
+            <h1>Tell us who you are</h1>
+            <p className="sk-sub__lead">
+              Every field is required, including your batch. The academy will
+              review this and add you to the students list if approved.
+            </p>
+            <form className="sk-sub__form sk-sub__form--grid" onSubmit={submitRequest}>
+              <label htmlFor="reqEmail">Email</label>
+              <input id="reqEmail" type="email" value={email} readOnly required />
+              <label htmlFor="reqFirst">First name</label>
+              <input
+                id="reqFirst"
+                value={requestForm.firstName}
+                onChange={(e) => updateRequest("firstName", e.target.value)}
+                required
+              />
+              <label htmlFor="reqLast">Last name</label>
+              <input
+                id="reqLast"
+                value={requestForm.lastName}
+                onChange={(e) => updateRequest("lastName", e.target.value)}
+                required
+              />
+              <label htmlFor="reqPhone">Phone</label>
+              <input
+                id="reqPhone"
+                value={requestForm.phone}
+                onChange={(e) => updateRequest("phone", e.target.value)}
+                required
+              />
+              <label htmlFor="reqDob">Date of birth</label>
+              <input
+                id="reqDob"
+                type="date"
+                value={requestForm.dateOfBirth}
+                onChange={(e) => updateRequest("dateOfBirth", e.target.value)}
+                required
+              />
+              <label htmlFor="reqTelegram">Telegram ID</label>
+              <input
+                id="reqTelegram"
+                value={requestForm.telegramUser}
+                onChange={(e) => updateRequest("telegramUser", e.target.value)}
+                required
+              />
+              <label htmlFor="reqTv">TradingView username</label>
+              <input
+                id="reqTv"
+                value={requestForm.tradingviewUsername}
+                onChange={(e) => updateRequest("tradingviewUsername", e.target.value)}
+                required
+              />
+              <BatchSelect
+                id="reqBatch"
+                kind={requestBatchKind}
+                batchId={requestForm.batchId}
+                batches={batches}
+                onKindChange={(next) => {
+                  setRequestBatchKind(next);
+                  updateRequest("batchId", "");
+                }}
+                onBatchChange={(value) => updateRequest("batchId", value)}
+              />
+              <label htmlFor="reqAddress">Address</label>
+              <textarea
+                id="reqAddress"
+                rows={3}
+                value={requestForm.address}
+                onChange={(e) => updateRequest("address", e.target.value)}
+                required
+              />
+              <label htmlFor="reqNote">Note</label>
+              <textarea
+                id="reqNote"
+                rows={3}
+                value={requestForm.note}
+                onChange={(e) => updateRequest("note", e.target.value)}
+                placeholder="Anything that helps identify you"
+                required
+              />
+              <button type="submit" className="btn-primary" disabled={busy}>
+                {busy ? "Sending…" : "Submit request"}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  setStep("email");
+                  setError("");
+                }}
+              >
+                Back to email
+              </button>
+            </form>
+          </>
+        ) : null}
+
+        {step === "request-done" ? (
+          <div className="sk-sub__done">
+            <span className="sk-sub__done-icon" aria-hidden="true">
+              <ShieldCheck size={28} />
+            </span>
+            <h1>Request sent</h1>
+            <p className="sk-sub__lead">
+              {requestDone ||
+                "The academy will review your details. After approval, use this same email on this page."}
+            </p>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                setStep("email");
+                setError("");
+              }}
+            >
+              Back to login
+            </button>
           </div>
         ) : null}
 
         {error ? <p className="portal-alert">{error}</p> : null}
       </main>
+
+      {showMissing ? (
+        <div className="sk-sub__modal" role="dialog" aria-modal="true">
+          <div className="sk-sub__modal-card">
+            <h2>Email not in the students list</h2>
+            <p>
+              Please confirm you entered the exact academy email. If this is
+              the correct email, fill the request form so the academy can add
+              you.
+            </p>
+            <div className="sk-sub__modal-actions">
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setShowMissing(false)}
+              >
+                Try another email
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setShowMissing(false);
+                  setStep("request");
+                  setError("");
+                }}
+              >
+                Fill request form
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <p className="sk-sub__foot">
         <KeyRound size={12} /> Student-only checkout · USDT BEP20
