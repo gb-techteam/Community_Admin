@@ -8,7 +8,6 @@ import Channels from "./pages/Channels.jsx";
 import ChannelMessages from "./pages/ChannelMessages.jsx";
 import Admins from "./pages/Admins.jsx";
 import Superkandle from "./pages/Superkandle.jsx";
-import SubscribeSuperkandle from "./pages/SubscribeSuperkandle.jsx";
 import Momentum from "./pages/Momentum.jsx";
 import Settings from "./pages/Settings.jsx";
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
@@ -22,10 +21,6 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />
-          <Route
-            path="/subscribe/superkandle"
-            element={<SubscribeSuperkandle />}
-          />
           <Route
             path="/dashboard"
             element={

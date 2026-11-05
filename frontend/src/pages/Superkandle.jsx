@@ -8,6 +8,7 @@ import {
   KeyRound,
   Link2,
   Pencil,
+  Share2,
   Plus,
   Search,
   Trash2,
@@ -116,8 +117,11 @@ export default function Superkandle() {
   }, []);
 
   async function copySubscribeLink() {
-    const path = checkout?.subscribePath || "/subscribe/superkandle";
-    const url = `${window.location.origin}${path}`;
+    const url = checkout?.subscribeUrl;
+    if (!url) {
+      setError("Set the student checkout URL in Settings first.");
+      return;
+    }
     try {
       await navigator.clipboard.writeText(url);
       setCopiedLink(true);
@@ -135,16 +139,32 @@ export default function Superkandle() {
     status = statusFilter,
     expiry = expiryFilter,
     payment = paymentFilter,
+    accessShared = sharedFilter,
     query = search,
   } = {}) {
     setStatusFilter(status);
     setExpiryFilter(expiry);
     setPaymentFilter(payment);
-    loadMembers(query, status, expiry, payment);
+    setSharedFilter(accessShared);
+    loadMembers(query, status, expiry, payment, accessShared);
   }
 
-  function openCreate() {
-    setEditingMember(null);
+  async function handleAccessShared(member, accessShared) {
+    try {
+      await api(`/api/superkandle/${member.id}/access-shared`, {
+        method: "PATCH",
+        body: JSON.stringify({ accessShared }),
+      });
+      await loadMembers();
+      notify({
+        title: accessShared ? "Access marked shared" : "Access unmarked",
+        message: accessShared
+          ? "This subscription is marked as invite/access shared."
+          : "This subscription is waiting for access to be shared.",
+      });
+    } catch (err) {
+      setError(err.message);
+    }
     setShowModal(true);
     setError("");
   }
@@ -433,6 +453,20 @@ export default function Superkandle() {
               <option value="overdue">Overdue</option>
             </select>
           </div>
+          <div className="filter-bar__select">
+            <label htmlFor="skSharedFilter">Invite shared</label>
+            <select
+              id="skSharedFilter"
+              value={sharedFilter}
+              onChange={(e) =>
+                applyView({ accessShared: e.target.value, query: search })
+              }
+            >
+              <option value="all">All</option>
+              <option value="false">Not shared</option>
+              <option value="true">Shared</option>
+            </select>
+          </div>
           <button
             type="button"
             className="btn-secondary"
@@ -452,13 +486,14 @@ export default function Superkandle() {
                 <th className="is-num">Amount</th>
                 <th>Expiry</th>
                 <th>Access</th>
+                <th>Invite</th>
                 <th className="is-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="table-empty">
+                  <td colSpan={8} className="table-empty">
                     <div className="sk-empty">
                       <strong>Loading roster</strong>
                       <span>Fetching memberships and billing…</span>
@@ -467,7 +502,7 @@ export default function Superkandle() {
                 </tr>
               ) : members.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="table-empty">
+                  <td colSpan={8} className="table-empty">
                     <div className="sk-empty">
                       <span className="sk-empty__icon" aria-hidden="true">
                         <Users size={20} strokeWidth={2} />
@@ -553,6 +588,29 @@ export default function Superkandle() {
                       >
                         {member.is_active ? "Active" : "Inactive"}
                       </span>
+                    </td>
+                    <td>
+                      <div className="sk-pay-cell">
+                        <span
+                          className={`sk-pill ${
+                            member.access_shared
+                              ? "sk-pill--active"
+                              : "sk-pill--pending"
+                          }`}
+                        >
+                          {member.access_shared ? "Shared" : "Not shared"}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() =>
+                            handleAccessShared(member, !member.access_shared)
+                          }
+                        >
+                          <Share2 size={14} strokeWidth={2} aria-hidden="true" />
+                          {member.access_shared ? "Undo" : "Mark shared"}
+                        </button>
+                      </div>
                     </td>
                     <td className="is-actions">
                       <div className="row-actions">

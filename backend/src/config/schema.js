@@ -445,6 +445,15 @@ export async function ensureSuperkandleSchema() {
   `);
 
   await pool.query(`
+    ALTER TABLE superkandle_members
+    ADD COLUMN IF NOT EXISTS access_shared BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+  await pool.query(`
+    ALTER TABLE superkandle_members
+    ADD COLUMN IF NOT EXISTS access_shared_at TIMESTAMPTZ
+  `);
+
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_superkandle_members_expires_at
     ON superkandle_members (expires_at)
   `);

@@ -8,7 +8,8 @@ import {
   ShieldCheck,
   Wallet,
 } from "lucide-react";
-import logo from "../logo/g-black.png";
+import { studentApi } from "../lib/api";
+import logo from "../assets/g-black.png";
 
 const USDT_BEP20 = "0x55d398326f99059fF775485246999027B3197955";
 
@@ -75,25 +76,7 @@ function moneyUsdt(value, digits = 2) {
   return `${n.toFixed(digits)} USDT`;
 }
 
-async function studentApi(path, { token, ...options } = {}) {
-  const headers = {
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const response = await fetch(`/api/superkandle/subscribe${path}`, {
-    ...options,
-    headers,
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.success === false) {
-    throw new Error(data.message || "Request failed");
-  }
-  return data;
-}
-
-export default function SubscribeSuperkandle() {
+export default function Subscribe() {
   const [step, setStep] = useState("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");

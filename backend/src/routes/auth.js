@@ -32,7 +32,7 @@ router.post("/login", async (req, res) => {
           powers: ALL_POWER_KEYS,
         },
         process.env.JWT_SECRET,
-        { expiresIn: "12h" }
+        { expiresIn: "24h" }
       );
 
       return res.json({
@@ -110,7 +110,7 @@ router.post("/login", async (req, res) => {
         powers,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "12h" }
+      { expiresIn: "24h" }
     );
 
     return res.json({
