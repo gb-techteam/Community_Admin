@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import {
   BadgeDollarSign,
   Ban,
+  Check,
   CircleDollarSign,
   Clock3,
   Copy,
   KeyRound,
   Link2,
+  Eye,
   Pencil,
-  Share2,
   Plus,
   Search,
   Trash2,
@@ -52,6 +53,14 @@ function expiryLabel(state) {
   return "No expiry";
 }
 
+function paymentMethodLabel(method) {
+  const value = String(method || "").trim();
+  if (!value) return "";
+  if (/usdt/i.test(value)) return "USDT";
+  if (value === "free_trial") return "Trial";
+  return value;
+}
+
 function durationLabel(value, unit = "month") {
   const n = Number(value) || 1;
   const u = String(unit || "month").toLowerCase();
@@ -69,11 +78,13 @@ export default function Superkandle() {
     expired: 0,
     expiring: 0,
     pending_payments: 0,
+    access_pending: 0,
   });
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [expiryFilter, setExpiryFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  const [sharedFilter, setSharedFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
@@ -81,12 +92,18 @@ export default function Superkandle() {
   const [loading, setLoading] = useState(true);
   const [checkout, setCheckout] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedTv, setCopiedTv] = useState("");
+  const [editingTvId, setEditingTvId] = useState(null);
+  const [tvDraft, setTvDraft] = useState("");
+  const [savingTv, setSavingTv] = useState(false);
+  const [viewingMember, setViewingMember] = useState(null);
 
   async function loadMembers(
     query = search,
     status = statusFilter,
     expiry = expiryFilter,
-    payment = paymentFilter
+    payment = paymentFilter,
+    accessShared = sharedFilter
   ) {
     setLoading(true);
     setError("");
@@ -96,12 +113,18 @@ export default function Superkandle() {
       if (status !== "all") params.set("status", status);
       if (expiry !== "all") params.set("expiry", expiry);
       if (payment !== "all") params.set("payment", payment);
+      if (accessShared !== "all") params.set("accessShared", accessShared);
 
       const data = await api(
         `/api/superkandle${params.toString() ? `?${params.toString()}` : ""}`
       );
-      setMembers(data.members || []);
+      const nextMembers = data.members || [];
+      setMembers(nextMembers);
       setStats(data.stats || stats);
+      setViewingMember((current) => {
+        if (!current) return current;
+        return nextMembers.find((row) => row.id === current.id) || current;
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -110,7 +133,7 @@ export default function Superkandle() {
   }
 
   useEffect(() => {
-    loadMembers("", "all", "all", "all");
+    loadMembers("", "all", "all", "all", "all");
     api("/api/superkandle/checkout-settings")
       .then(setCheckout)
       .catch(() => {});
@@ -150,10 +173,25 @@ export default function Superkandle() {
   }
 
   async function handleAccessShared(member, accessShared) {
+    const name = fullName(member.first_name, member.last_name);
+    const ok = await confirm({
+      title: accessShared ? "Mark invite as shared?" : "Undo shared invite?",
+      message: accessShared
+        ? `Confirm that TradingView access has been shared with ${name}.`
+        : `Mark ${name} as not shared again?`,
+      confirmLabel: accessShared ? "Mark shared" : "Undo",
+      tone: accessShared ? "info" : "danger",
+    });
+    if (!ok) return;
+
     try {
       await api(`/api/superkandle/${member.id}/access-shared`, {
         method: "PATCH",
-        body: JSON.stringify({ accessShared }),
+        body: JSON.stringify({
+          accessShared,
+          error: false,
+          errorMessage: "",
+        }),
       });
       await loadMembers();
       notify({
@@ -165,14 +203,70 @@ export default function Superkandle() {
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  async function copyTradingview(member) {
+    const username = String(member.tradingview_username || "").trim();
+    if (!username) return;
+    try {
+      await navigator.clipboard.writeText(username);
+      setCopiedTv(member.id);
+      setTimeout(() => setCopiedTv(""), 1400);
+    } catch {
+      setError("Could not copy TradingView username");
+    }
+  }
+
+  function startEditTradingview(member) {
+    setEditingTvId(member.id);
+    setTvDraft(member.tradingview_username || "");
+  }
+
+  async function saveTradingview(member) {
+    const name = fullName(member.first_name, member.last_name);
+    const ok = await confirm({
+      title: "Save TradingView username?",
+      message: tvDraft.trim()
+        ? `Update TradingView ID for ${name} to “${tvDraft.trim()}”?`
+        : `Clear the TradingView ID for ${name}?`,
+      confirmLabel: "Save",
+      tone: "info",
+    });
+    if (!ok) return;
+
+    setSavingTv(true);
+    setError("");
+    try {
+      await api(`/api/superkandle/${member.id}/tradingview`, {
+        method: "PATCH",
+        body: JSON.stringify({ tradingviewUsername: tvDraft }),
+      });
+      setEditingTvId(null);
+      await loadMembers();
+      notify({
+        title: "TradingView updated",
+        message: "The username is saved for this student.",
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingTv(false);
+    }
+  }
+
+  function openCreate() {
+    setEditingMember(null);
     setShowModal(true);
     setError("");
   }
 
-  function openEdit(member) {
-    setEditingMember(member);
-    setShowModal(true);
+  function openView(member) {
+    setViewingMember(member);
     setError("");
+  }
+
+  function closeView() {
+    setViewingMember(null);
   }
 
   function closeModal() {
@@ -192,6 +286,7 @@ export default function Superkandle() {
 
     try {
       await api(`/api/superkandle/${id}`, { method: "DELETE" });
+      setViewingMember((current) => (current?.id === id ? null : current));
       await loadMembers();
       notify({
         title: "Member removed",
@@ -371,6 +466,91 @@ export default function Superkandle() {
 
       {error ? <p className="portal-alert">{error}</p> : null}
 
+      {viewingMember ? (
+        <section className="entity-form student-detail">
+          <div className="entity-form__header">
+            <h2>
+              {fullName(viewingMember.first_name, viewingMember.last_name)}
+            </h2>
+            <button type="button" className="btn-ghost" onClick={closeView}>
+              Close
+            </button>
+          </div>
+
+          <div className="student-detail__ids">
+            <div className="student-detail__id-card">
+              <span>TradingView ID</span>
+              <strong>{viewingMember.tradingview_username || "—"}</strong>
+            </div>
+            <div className="student-detail__id-card">
+              <span>Invite</span>
+              <strong>
+                {viewingMember.access_shared ? "Shared" : "Not shared"}
+              </strong>
+            </div>
+          </div>
+
+          <dl className="student-detail__dl">
+            <div className="student-detail__item">
+              <dt>Email</dt>
+              <dd>{viewingMember.email || "—"}</dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Phone</dt>
+              <dd>{viewingMember.phone || "—"}</dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Plan</dt>
+              <dd>
+                {viewingMember.plan_name || "No plan"}
+                {viewingMember.plan_duration_value ||
+                viewingMember.plan_duration_months
+                  ? ` · ${durationLabel(
+                      viewingMember.plan_duration_value ||
+                        viewingMember.plan_duration_months,
+                      viewingMember.plan_duration_unit
+                    )}`
+                  : ""}
+              </dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Amount</dt>
+              <dd>{money(viewingMember.amount)}</dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Payment</dt>
+              <dd>
+                {viewingMember.payment_status}
+                {paymentMethodLabel(viewingMember.payment_method)
+                  ? ` · ${paymentMethodLabel(viewingMember.payment_method)}`
+                  : ""}
+              </dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Paid on</dt>
+              <dd>{formatDate(viewingMember.payment_date)}</dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Expiry</dt>
+              <dd>
+                {expiryLabel(viewingMember.expiry_state)} ·{" "}
+                {formatDate(viewingMember.expires_at)}
+              </dd>
+            </div>
+            <div className="student-detail__item">
+              <dt>Access</dt>
+              <dd>{viewingMember.is_active ? "Active" : "Inactive"}</dd>
+            </div>
+            {viewingMember.payment_note ? (
+              <div className="student-detail__item student-detail__item--span">
+                <dt>Note</dt>
+                <dd>{viewingMember.payment_note}</dd>
+              </div>
+            ) : null}
+          </dl>
+        </section>
+      ) : null}
+
       {showModal ? (
         <SuperkandleMemberModal
           member={editingMember}
@@ -403,7 +583,7 @@ export default function Superkandle() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, email, phone, or plan"
+              placeholder="Search name, email, phone, plan, or TradingView"
               onKeyDown={(e) => {
                 if (e.key === "Enter") loadMembers();
               }}
@@ -477,23 +657,24 @@ export default function Superkandle() {
         </div>
 
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table sk-table">
             <thead>
               <tr>
-                <th>Student</th>
-                <th>Plan</th>
-                <th>Payment</th>
-                <th className="is-num">Amount</th>
-                <th>Expiry</th>
-                <th>Access</th>
-                <th>Invite</th>
-                <th className="is-actions">Actions</th>
+                <th className="sk-col-student">Student</th>
+                <th className="sk-col-tv">TradingView</th>
+                <th className="sk-col-plan">Plan</th>
+                <th className="sk-col-pay">Payment</th>
+                <th className="sk-col-amount">Amount</th>
+                <th className="sk-col-expiry">Expiry</th>
+                <th className="sk-col-access">Access</th>
+                <th className="sk-col-invite">Invite</th>
+                <th className="sk-col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
+                  <td colSpan={9} className="table-empty">
                     <div className="sk-empty">
                       <strong>Loading roster</strong>
                       <span>Fetching memberships and billing…</span>
@@ -502,7 +683,7 @@ export default function Superkandle() {
                 </tr>
               ) : members.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="table-empty">
+                  <td colSpan={9} className="table-empty">
                     <div className="sk-empty">
                       <span className="sk-empty__icon" aria-hidden="true">
                         <Users size={20} strokeWidth={2} />
@@ -518,11 +699,11 @@ export default function Superkandle() {
                 members.map((member) => (
                   <tr
                     key={member.id}
-                    className={
+                    className={`${
                       member.expiry_state === "expired" ? "sk-row--risk" : ""
-                    }
+                    } ${viewingMember?.id === member.id ? "sk-row--on" : ""}`}
                   >
-                    <td>
+                    <td className="sk-col-student">
                       <EntityCell
                         title={fullName(member.first_name, member.last_name)}
                         subtitle={
@@ -532,23 +713,88 @@ export default function Superkandle() {
                         }
                       />
                     </td>
-                    <td>
-                      <EntityCell
-                        title={member.plan_name || "No plan"}
-                        subtitle={
-                          member.plan_duration_value ||
+                    <td className="sk-col-tv">
+                      {editingTvId === member.id ? (
+                        <form
+                          className="sk-tv-edit"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            saveTradingview(member);
+                          }}
+                        >
+                          <input
+                            value={tvDraft}
+                            onChange={(e) => setTvDraft(e.target.value)}
+                            placeholder="TradingView ID"
+                            autoFocus
+                            disabled={savingTv}
+                          />
+                          <button
+                            type="submit"
+                            className="sk-tv-icon"
+                            disabled={savingTv}
+                            aria-label="Save TradingView username"
+                          >
+                            <Check size={14} strokeWidth={2} />
+                          </button>
+                          <button
+                            type="button"
+                            className="sk-tv-icon"
+                            onClick={() => setEditingTvId(null)}
+                            disabled={savingTv}
+                            aria-label="Cancel"
+                          >
+                            ×
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="sk-tv-cell">
+                          <span
+                            className="sk-tv-name"
+                            title={member.tradingview_username || ""}
+                          >
+                            {member.tradingview_username || "—"}
+                          </span>
+                          <button
+                            type="button"
+                            className="sk-tv-icon"
+                            disabled={!member.tradingview_username}
+                            onClick={() => copyTradingview(member)}
+                            aria-label="Copy TradingView username"
+                          >
+                            {copiedTv === member.id ? (
+                              <Check size={14} strokeWidth={2} />
+                            ) : (
+                              <Copy size={14} strokeWidth={2} />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="sk-tv-icon"
+                            onClick={() => startEditTradingview(member)}
+                            aria-label="Edit TradingView username"
+                          >
+                            <Pencil size={14} strokeWidth={2} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td className="sk-col-plan">
+                      <div className="sk-pay-cell">
+                        <strong>{member.plan_name || "No plan"}</strong>
+                        <span className="cell-muted">
+                          {member.plan_duration_value ||
                           member.plan_duration_months
                             ? durationLabel(
                                 member.plan_duration_value ||
                                   member.plan_duration_months,
                                 member.plan_duration_unit
                               )
-                            : "—"
-                        }
-                        tone="sage"
-                      />
+                            : "—"}
+                        </span>
+                      </div>
                     </td>
-                    <td>
+                    <td className="sk-col-pay">
                       <div className="sk-pay-cell">
                         <span
                           className={`sk-pill sk-pill--${member.payment_status}`}
@@ -557,16 +803,16 @@ export default function Superkandle() {
                         </span>
                         <span className="cell-muted">
                           {formatDate(member.payment_date)}
-                          {member.payment_method
-                            ? ` · ${member.payment_method}`
+                          {paymentMethodLabel(member.payment_method)
+                            ? ` · ${paymentMethodLabel(member.payment_method)}`
                             : ""}
                         </span>
                       </div>
                     </td>
-                    <td className="is-num">
+                    <td className="sk-col-amount">
                       <MetricCell value={money(member.amount)} label="USD" />
                     </td>
-                    <td>
+                    <td className="sk-col-expiry">
                       <div className="sk-pay-cell">
                         <span
                           className={`sk-pill sk-pill--${member.expiry_state}`}
@@ -578,7 +824,7 @@ export default function Superkandle() {
                         </span>
                       </div>
                     </td>
-                    <td>
+                    <td className="sk-col-access">
                       <span
                         className={`sk-pill ${
                           member.is_active
@@ -589,8 +835,8 @@ export default function Superkandle() {
                         {member.is_active ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td>
-                      <div className="sk-pay-cell">
+                    <td className="sk-col-invite">
+                      <div className="sk-invite-cell">
                         <span
                           className={`sk-pill ${
                             member.access_shared
@@ -602,25 +848,24 @@ export default function Superkandle() {
                         </span>
                         <button
                           type="button"
-                          className="btn-ghost"
+                          className="sk-invite-btn"
                           onClick={() =>
                             handleAccessShared(member, !member.access_shared)
                           }
                         >
-                          <Share2 size={14} strokeWidth={2} aria-hidden="true" />
                           {member.access_shared ? "Undo" : "Mark shared"}
                         </button>
                       </div>
                     </td>
-                    <td className="is-actions">
+                    <td className="sk-col-actions">
                       <div className="row-actions">
                         <button
                           type="button"
                           className="btn-ghost"
-                          onClick={() => openEdit(member)}
+                          onClick={() => openView(member)}
                         >
-                          <Pencil size={14} strokeWidth={2} aria-hidden="true" />
-                          Edit
+                          <Eye size={14} strokeWidth={2} aria-hidden="true" />
+                          View
                         </button>
                         <button
                           type="button"
