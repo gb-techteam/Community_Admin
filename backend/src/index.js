@@ -19,10 +19,7 @@ import superkandleRoutes from "./routes/superkandle.js";
 import superkandleSubscribeRoutes from "./routes/superkandleSubscribe.js";
 import momentumRoutes from "./routes/momentum.js";
 import settingsRoutes from "./routes/settings.js";
-import {
-  startExpiryMailJob,
-  startInvitationSharedMailJob,
-} from "./services/superkandleMails.js";
+import { startExpiryMailJob } from "./services/superkandleMails.js";
 
 dotenv.config();
 
@@ -77,7 +74,6 @@ async function start() {
 
   attachChannelRealtime(server);
   startExpiryMailJob();
-  startInvitationSharedMailJob();
 
   server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

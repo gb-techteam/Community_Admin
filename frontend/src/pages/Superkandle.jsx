@@ -262,7 +262,7 @@ export default function Superkandle() {
         body: JSON.stringify(
           accessShared
             ? { accessShared: true, error: false, errorMessage: "" }
-            : { accessShared: false, unmark: true }
+            : { accessShared: false }
         ),
       });
       await loadMembers();
