@@ -1,12 +1,5 @@
-import path from "path";
-import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import { loadSettings } from "./portalSettings.js";
-
-const GB_LOGO_PATH = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../assets/g-black.png"
-);
 
 export async function smtpReady() {
   const settings = await loadSettings();
@@ -21,11 +14,37 @@ async function subscribeUrl() {
   );
 }
 
+function mailFrom(settings) {
+  const raw = String(settings.smtpFrom || settings.smtpUser || "").trim();
+  const bracket = raw.match(/^(.*)<([^>]+)>\s*$/);
+  if (bracket) {
+    return {
+      name:
+        bracket[1].replace(/^["']|["']$/g, "").trim() ||
+        "GREENBONDS GROWTH ACADEMY",
+      address: bracket[2].trim(),
+    };
+  }
+  const parts = raw.split(/\s+/).filter(Boolean);
+  const last = parts[parts.length - 1] || "";
+  if (last.includes("@") && parts.length > 1) {
+    return {
+      name: parts.slice(0, -1).join(" ").replace(/^["']|["']$/g, ""),
+      address: last,
+    };
+  }
+  return {
+    name: "GREENBONDS GROWTH ACADEMY",
+    address: raw.includes("@") ? raw : settings.smtpUser,
+  };
+}
+
 async function sendMail({ to, subject, text, html }) {
   const settings = await loadSettings();
   if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPass) {
     throw new Error("Email is not configured");
   }
+  const from = mailFrom(settings);
   const transporter = nodemailer.createTransport({
     host: settings.smtpHost,
     port: Number(settings.smtpPort || 587),
@@ -36,25 +55,17 @@ async function sendMail({ to, subject, text, html }) {
     },
   });
   await transporter.sendMail({
-    from: settings.smtpFrom || settings.smtpUser,
+    from,
     to,
     subject,
     text,
     html,
-    attachments: [
-      {
-        filename: "gb-logo.png",
-        path: GB_LOGO_PATH,
-        cid: "gb-logo",
-      },
-    ],
   });
 }
 
 function layout(title, bodyHtml) {
   return `<div style="font-family:Inter,Arial,sans-serif;background:#f4f7fb;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e7edf3;border-radius:16px;padding:24px 28px;color:#1b2430">
-    <img src="cid:gb-logo" alt="Greenbonds" width="36" height="36" style="display:block;margin:0 0 14px;border:0" />
     <p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8b97a3">SuperKandle</p>
     <h1 style="margin:0 0 16px;font-size:22px;font-weight:600">${title}</h1>
     ${bodyHtml}
