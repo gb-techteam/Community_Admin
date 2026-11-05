@@ -7,6 +7,7 @@ import { getAdminTypeAndPowers } from "../services/portalAdmins.js";
 
 // channelId -> Set<WebSocket>
 const channelRooms = new Map();
+const superkandleRoom = new Set();
 
 function send(socket, payload) {
   if (socket.readyState === 1) {
@@ -22,6 +23,8 @@ function leaveAllRooms(socket) {
     if (!room.size) channelRooms.delete(channelId);
   }
   socket.subscribedChannels = new Set();
+  superkandleRoom.delete(socket);
+  socket.subscribedSuperkandle = false;
 }
 
 function joinRoom(socket, channelId) {
@@ -98,6 +101,25 @@ function canUseChannels(admin) {
   );
 }
 
+function canUseSuperkandle(admin) {
+  return isSuperAdmin(admin) || hasPower(admin, "manage_superkandle");
+}
+
+function canUseRealtime(admin) {
+  return canUseChannels(admin) || canUseSuperkandle(admin);
+}
+
+export function broadcastSuperkandleAccess(member) {
+  if (!superkandleRoom.size) return;
+  const payload = JSON.stringify({
+    type: "superkandle.access",
+    member,
+  });
+  for (const socket of superkandleRoom) {
+    if (socket.readyState === 1) socket.send(payload);
+  }
+}
+
 export function broadcastChannelEvent(channelId, type, data = {}) {
   const room = channelRooms.get(Number(channelId));
   if (!room?.size) return;
@@ -130,10 +152,14 @@ export function attachChannelRealtime(server) {
       const token = url.searchParams.get("token");
       if (token) {
         socket.admin = await resolveAdminFromToken(token);
-        if (!canUseChannels(socket.admin)) {
-          send(socket, { type: "error", message: "No channel access" });
+        if (!canUseRealtime(socket.admin)) {
+          send(socket, { type: "error", message: "No realtime access" });
           socket.close(1008, "Forbidden");
           return;
+        }
+        if (canUseSuperkandle(socket.admin)) {
+          superkandleRoom.add(socket);
+          socket.subscribedSuperkandle = true;
         }
         send(socket, { type: "ready" });
       } else {
@@ -160,10 +186,14 @@ export function attachChannelRealtime(server) {
       try {
         if (payload.type === "auth") {
           socket.admin = await resolveAdminFromToken(payload.token);
-          if (!canUseChannels(socket.admin)) {
-            send(socket, { type: "error", message: "No channel access" });
+          if (!canUseRealtime(socket.admin)) {
+            send(socket, { type: "error", message: "No realtime access" });
             socket.close(1008, "Forbidden");
             return;
+          }
+          if (canUseSuperkandle(socket.admin)) {
+            superkandleRoom.add(socket);
+            socket.subscribedSuperkandle = true;
           }
           send(socket, { type: "ready" });
           return;
@@ -176,6 +206,27 @@ export function attachChannelRealtime(server) {
 
         if (payload.type === "ping") {
           send(socket, { type: "pong", at: Date.now() });
+          return;
+        }
+
+        if (payload.type === "subscribe" && payload.topic === "superkandle") {
+          if (!canUseSuperkandle(socket.admin)) {
+            send(socket, {
+              type: "error",
+              message: "You do not have SuperKandle access",
+            });
+            return;
+          }
+          superkandleRoom.add(socket);
+          socket.subscribedSuperkandle = true;
+          send(socket, { type: "subscribed", topic: "superkandle" });
+          return;
+        }
+
+        if (payload.type === "unsubscribe" && payload.topic === "superkandle") {
+          superkandleRoom.delete(socket);
+          socket.subscribedSuperkandle = false;
+          send(socket, { type: "unsubscribed", topic: "superkandle" });
           return;
         }
 

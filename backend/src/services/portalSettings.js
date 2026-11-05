@@ -10,6 +10,7 @@ const KEYS = {
   smtpPass: "smtp_pass",
   smtpFrom: "smtp_from",
   expiryNoticeDays: "expiry_notice_days",
+  displayPricedPlans: "display_priced_plans",
 };
 
 let cache = null;
@@ -20,11 +21,20 @@ function pick(db, key, envValue = "") {
   return String(envValue || "");
 }
 
+function parseFlag(value, fallback = true) {
+  if (value == null || String(value).trim() === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return fallback;
+}
+
 export function invalidateSettingsCache() {
   cache = null;
 }
 
 export async function loadSettings() {
+  if (cache && !("displayPricedPlans" in cache)) cache = null;
   if (cache) return cache;
 
   const result = await pool.query("SELECT key, value FROM portal_settings");
@@ -55,6 +65,7 @@ export async function loadSettings() {
       Number.isFinite(expiry) && expiry >= 1 && expiry <= 30
         ? Math.round(expiry)
         : 7,
+    displayPricedPlans: parseFlag(db[KEYS.displayPricedPlans], true),
   };
 
   return cache;
@@ -63,6 +74,7 @@ export async function loadSettings() {
 export function publicSettings(settings) {
   return {
     usdtBep20Wallet: settings.usdtBep20Wallet,
+    displayPricedPlans: settings.displayPricedPlans !== false,
     bscRpcUrl: settings.bscRpcUrl,
     publicAppUrl: settings.publicAppUrl,
     smtpHost: settings.smtpHost,
@@ -104,6 +116,12 @@ export async function saveSettings(patch) {
       next.expiryNoticeDays = Math.round(days);
     }
   }
+  if (patch.displayPricedPlans != null) {
+    next.displayPricedPlans = parseFlag(
+      patch.displayPricedPlans,
+      next.displayPricedPlans
+    );
+  }
 
   const rows = [
     [KEYS.usdtBep20Wallet, next.usdtBep20Wallet],
@@ -115,6 +133,7 @@ export async function saveSettings(patch) {
     [KEYS.smtpPass, next.smtpPass],
     [KEYS.smtpFrom, next.smtpFrom],
     [KEYS.expiryNoticeDays, String(next.expiryNoticeDays)],
+    [KEYS.displayPricedPlans, next.displayPricedPlans ? "true" : "false"],
   ];
 
   for (const [key, value] of rows) {

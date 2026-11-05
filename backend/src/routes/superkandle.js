@@ -2,14 +2,32 @@ import express from "express";
 import pool from "../config/db.js";
 import { requireAuth, requirePower } from "../middleware/auth.js";
 import {
+  clearMemberAccessError,
   markTrialClaimed,
   markTrialClaimedMany,
+  resetAllTrialClaims,
+  resetTrialClaim,
 } from "../services/superkandleAccess.js";
 import { receiveWallet } from "../services/bscUsdt.js";
-import { loadSettings } from "../services/portalSettings.js";
-import { notifyMembershipActivated } from "../services/superkandleMails.js";
+import { loadSettings, saveSettings } from "../services/portalSettings.js";
+import {
+  notifyInvitationFailed,
+  notifyInvitationSharedOnce,
+  notifyMembershipActivated,
+} from "../services/superkandleMails.js";
+import { broadcastSuperkandleAccess } from "../realtime/channels.js";
 
 const router = express.Router();
+
+router.use((req, _res, next) => {
+  if (req.method !== "GET") {
+    console.log(
+      `SuperKandle ${req.method} ${req.originalUrl}`,
+      JSON.stringify(req.body || {})
+    );
+  }
+  next();
+});
 
 router.use(requireAuth);
 router.use(requirePower("manage_superkandle"));
@@ -101,7 +119,12 @@ function memberSelect(where = "", order = "m.created_at DESC, m.id DESC") {
         WHEN m.expires_at < CURRENT_DATE THEN 'expired'
         WHEN m.expires_at <= CURRENT_DATE + INTERVAL '7 days' THEN 'expiring'
         ELSE 'active'
-      END AS expiry_state
+      END AS expiry_state,
+      EXISTS (
+        SELECT 1
+        FROM superkandle_trial_claims t
+        WHERE t.student_id = m.student_id
+      ) AS trial_used
     FROM superkandle_members m
     JOIN students s ON s.id = m.student_id
     LEFT JOIN superkandle_plans p ON p.id = m.plan_id
@@ -272,12 +295,77 @@ router.get("/checkout-settings", async (_req, res) => {
       usdtNetwork: "BEP20",
       walletConfigured: Boolean(wallet),
       wallet,
+      displayPricedPlans: settings.displayPricedPlans !== false,
     });
   } catch (error) {
     console.error("Checkout settings error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to load checkout settings",
+    });
+  }
+});
+
+router.patch("/checkout-settings", async (req, res) => {
+  try {
+    const settings = await saveSettings({
+      displayPricedPlans: req.body?.displayPricedPlans,
+    });
+    res.json({
+      success: true,
+      displayPricedPlans: settings.displayPricedPlans !== false,
+    });
+  } catch (error) {
+    console.error("Update checkout settings error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save SuperKandle settings",
+    });
+  }
+});
+
+router.post("/reset-trials", async (_req, res) => {
+  try {
+    const resetCount = await resetAllTrialClaims();
+    res.json({
+      success: true,
+      resetCount,
+      message: `Free trial reset for ${resetCount} student${resetCount === 1 ? "" : "s"}.`,
+    });
+  } catch (error) {
+    console.error("Reset SuperKandle trials error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset free trials",
+    });
+  }
+});
+
+router.post("/:id/reset-trial", async (req, res) => {
+  try {
+    const existing = await getMember(req.params.id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Superkandle member not found",
+      });
+    }
+
+    const reset = await resetTrialClaim(existing.student_id);
+    const member = await getMember(req.params.id);
+    res.json({
+      success: true,
+      reset,
+      member,
+      message: reset
+        ? "This student can take the free trial again."
+        : "This student did not have a used free trial.",
+    });
+  } catch (error) {
+    console.error("Reset SuperKandle trial error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset this student's free trial",
     });
   }
 });
@@ -537,8 +625,13 @@ router.get("/", async (req, res) => {
 });
 
 function parseAccessShared(value) {
-  if (value === true || value === "true" || value === "1") return true;
-  if (value === false || value === "false" || value === "0") return false;
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  const text = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (["true", "1", "yes"].includes(text)) return true;
+  if (["false", "0", "no"].includes(text)) return false;
   return null;
 }
 
@@ -634,6 +727,7 @@ router.patch("/:id/tradingview", async (req, res) => {
       `,
       [username, existing.student_id]
     );
+    await clearMemberAccessError(existing.student_id);
 
     res.json({
       success: true,
@@ -659,18 +753,43 @@ router.patch("/:id/access-shared", async (req, res) => {
       });
     }
 
-    const accessShared = parseAccessShared(req.body?.accessShared);
-    if (accessShared == null) {
-      const errorMessage = "accessShared must be true or false";
-      return res.status(400).json({
-        error: true,
-        errorMessage,
-      });
-    }
-
     const hasError = parseAccessShared(req.body?.error);
-    const accessError = hasError == null ? false : hasError;
-    const errorMessage = String(req.body?.errorMessage || "").trim();
+    const parsedShared = parseAccessShared(
+      req.body?.accessShared ??
+        req.body?.access_shared ??
+        req.body?.student?.accessShared
+    );
+    const errorMessage = String(
+      req.body?.errorMessage ?? req.body?.error_message ?? ""
+    ).trim();
+    const isUnmark =
+      parseAccessShared(req.body?.unmark ?? req.body?.undo) === true;
+
+    console.log(
+      "Access-shared PATCH",
+      JSON.stringify({
+        id: req.params.id,
+        hasError,
+        parsedShared,
+        isUnmark,
+        body: req.body,
+      })
+    );
+
+    // This URL is the share-result callback. The bot often still sends
+    // accessShared:false (GET row). Unless error/unmark, mark shared + mail.
+    let accessError = false;
+    let accessShared = true;
+    if (hasError === true) {
+      accessError = true;
+      accessShared = false;
+    } else if (isUnmark) {
+      accessError = false;
+      accessShared = false;
+    } else {
+      accessError = false;
+      accessShared = true;
+    }
 
     await pool.query(
       `
@@ -680,6 +799,7 @@ router.patch("/:id/access-shared", async (req, res) => {
         access_shared_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
         access_error = $2,
         access_error_message = $3,
+        invitation_mail_sent_at = CASE WHEN $1 THEN invitation_mail_sent_at ELSE NULL END,
         updated_at = NOW()
       WHERE id = $4
       `,
@@ -688,10 +808,32 @@ router.patch("/:id/access-shared", async (req, res) => {
 
     const member = await getMember(req.params.id);
     const student = registeredStudent(member);
+    let mail = { sent: false };
+    if (accessError) {
+      mail = await notifyInvitationFailed(
+        member.student_id,
+        errorMessage,
+        member
+      );
+    } else if (accessShared === true) {
+      mail = await notifyInvitationSharedOnce(member.student_id, member);
+    }
+    if (accessShared === true && !mail.sent) {
+      console.error(
+        "Invitation shared mail did not send",
+        mail.error || "unknown",
+        member.student_id,
+        member.email
+      );
+    }
+    broadcastSuperkandleAccess(member);
     res.json({
+      success: true,
       error: student.error,
       errorMessage: student.errorMessage,
       student,
+      mailSent: Boolean(mail.sent),
+      mailError: mail.error || "",
     });
   } catch (error) {
     console.error("Update access shared error:", error.message);
@@ -1013,8 +1155,9 @@ router.post("/", async (req, res) => {
 
 router.put("/:id", async (req, res) => {
   try {
+    console.log("coming in the put api in the id")  
     const existing = await getMember(req.params.id);
-    if (!existing) {
+    if (!existing) {  
       return res.status(404).json({
         success: false,
         message: "Superkandle member not found",
@@ -1044,7 +1187,11 @@ router.put("/:id", async (req, res) => {
       payload.amount != null ? payload.amount : effectivePlanPrice(plan);
     const expiresAt = resolveExpiresAt(payload, plan);
 
-    const accessShared = parseAccessShared(req.body.accessShared);
+    const accessShared = parseAccessShared(
+      req.body.accessShared ??
+        req.body.access_shared ??
+        req.body.student?.accessShared
+    );
     const nextAccessShared =
       accessShared == null ? Boolean(existing.access_shared) : accessShared;
 
@@ -1065,6 +1212,10 @@ router.put("/:id", async (req, res) => {
           WHEN $9 = TRUE AND COALESCE(access_shared, FALSE) = FALSE THEN NOW()
           WHEN $9 = FALSE THEN NULL
           ELSE access_shared_at
+        END,
+        invitation_mail_sent_at = CASE
+          WHEN $9 = FALSE THEN NULL
+          ELSE invitation_mail_sent_at
         END,
         updated_at = NOW()
       WHERE id = $10
@@ -1088,6 +1239,9 @@ router.put("/:id", async (req, res) => {
     }
 
     const member = await getMember(req.params.id);
+    if (nextAccessShared === true) {
+      await notifyInvitationSharedOnce(existing.student_id, member);
+    }
     if (payload.paymentStatus === "paid") {
       await notifyMembershipActivated({
         studentId: existing.student_id,

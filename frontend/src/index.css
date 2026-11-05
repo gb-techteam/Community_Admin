@@ -5995,6 +5995,46 @@ body.portal-menu-lock {
   color: #1b2430;
 }
 
+.sk-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.sk-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #e7edf3;
+  border-radius: 999px;
+  background: #fff;
+  color: #5b6875;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.sk-tab.is-on {
+  background: #1b2430;
+  border-color: #1b2430;
+  color: #fff;
+}
+
+.sk-tab__count {
+  min-width: 1.2rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(232, 93, 4, 0.16);
+  color: #c44900;
+  font-size: 0.7rem;
+}
+
+.sk-tab.is-on .sk-tab__count {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
 .sk-dash__actions {
   display: flex;
   flex-wrap: wrap;
@@ -6345,6 +6385,45 @@ body.portal-menu-lock {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.22rem;
+}
+
+.sk-invite-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sk-error-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(180, 35, 24, 0.12);
+  color: var(--danger);
+}
+
+.sk-view-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(180, 35, 24, 0.08);
+  border: 1px solid rgba(180, 35, 24, 0.16);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.sk-view-error strong {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .sk-invite-btn {
@@ -7019,9 +7098,15 @@ body.portal-menu-lock {
 }
 
 .sk-pill--inactive,
-.sk-pill--unknown {
+.sk-pill--unknown,
+.sk-pill--rejected {
   background: rgba(16, 35, 31, 0.08);
   color: var(--muted);
+}
+
+.sk-pill--approved {
+  background: rgba(34, 120, 78, 0.12);
+  color: #1f7a4d;
 }
 
 .sk-plan-hint {
@@ -7159,6 +7244,20 @@ body.portal-menu-lock {
   overflow: auto;
   padding: 1rem 1.2rem 1.2rem;
   background: linear-gradient(180deg, #fbfcfb 0%, #f4f7f5 100%);
+}
+
+.sk-plans-offer {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(26, 74, 63, 0.1);
+}
+
+.sk-plans-offer .btn-secondary {
+  justify-self: start;
 }
 
 .sk-plans-modal__foot {

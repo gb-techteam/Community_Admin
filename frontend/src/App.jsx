@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Login from "./pages/Login.jsx";
 import Overview from "./pages/Overview.jsx";
 import Students from "./pages/Students.jsx";
+import StudentRequests from "./pages/StudentRequests.jsx";
 import Courses from "./pages/Courses.jsx";
 import Batches from "./pages/Batches.jsx";
 import Channels from "./pages/Channels.jsx";
@@ -35,6 +36,14 @@ export default function App() {
               element={
                 <PowerRoute powers={["manage_students"]}>
                   <Students />
+                </PowerRoute>
+              }
+            />
+            <Route
+              path="student-requests"
+              element={
+                <PowerRoute powers={["manage_students", "manage_superkandle"]}>
+                  <StudentRequests />
                 </PowerRoute>
               }
             />

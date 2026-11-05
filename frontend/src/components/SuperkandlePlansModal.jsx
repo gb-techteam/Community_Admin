@@ -6,6 +6,7 @@ import {
   Layers,
   Pencil,
   Plus,
+  RotateCcw,
   Tag,
   Trash2,
   X,
@@ -63,6 +64,8 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [displayPricedPlans, setDisplayPricedPlans] = useState(true);
+  const [resettingTrials, setResettingTrials] = useState(false);
 
   const suggestionValues = useMemo(
     () =>
@@ -76,9 +79,13 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
     setLoading(true);
     setError("");
     try {
-      const data = await api("/api/superkandle/plans");
+      const [data, checkout] = await Promise.all([
+        api("/api/superkandle/plans"),
+        api("/api/superkandle/checkout-settings"),
+      ]);
       setPlans(data.plans || []);
       setDurationSuggestions(data.durationSuggestions || FALLBACK_SUGGESTIONS);
+      setDisplayPricedPlans(checkout.displayPricedPlans !== false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -216,6 +223,51 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
       });
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function togglePricedPlans(next) {
+    const previous = displayPricedPlans;
+    setDisplayPricedPlans(next);
+    setError("");
+    try {
+      await api("/api/superkandle/checkout-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ displayPricedPlans: next }),
+      });
+      notify({
+        title: next ? "Priced plans visible" : "Priced plans hidden",
+        message: next
+          ? "Students can see paid SuperKandle plans."
+          : "Students will only see a free plan, if one is active.",
+      });
+    } catch (err) {
+      setDisplayPricedPlans(previous);
+      setError(err.message);
+    }
+  }
+
+  async function resetTrials() {
+    const ok = await confirm({
+      title: "Reset free trials for every student?",
+      message:
+        "Every student will be able to take the free SuperKandle trial again.",
+      confirmLabel: "Reset trials",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setResettingTrials(true);
+    setError("");
+    try {
+      const data = await api("/api/superkandle/reset-trials", { method: "POST" });
+      notify({
+        title: "Free trials reset",
+        message: data.message || "Every student can take the free trial again.",
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setResettingTrials(false);
     }
   }
 
@@ -471,6 +523,33 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
           </form>
         ) : (
           <div className="sk-plans-modal__body">
+            <div className="sk-plans-offer">
+              <label className="sk-plans-default">
+                <input
+                  type="checkbox"
+                  checked={displayPricedPlans}
+                  onChange={(e) => togglePricedPlans(e.target.checked)}
+                />
+                <span className="sk-plans-default__box" aria-hidden="true" />
+                <span className="sk-plans-default__copy">
+                  <strong>Display priced plans</strong>
+                  <em>
+                    If this is off, students can only take a free plan. If there
+                    is no free plan, they will see that there is no SuperKandle
+                    offer.
+                  </em>
+                </span>
+              </label>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={resetTrials}
+                disabled={resettingTrials}
+              >
+                <RotateCcw size={16} strokeWidth={2} aria-hidden="true" />
+                {resettingTrials ? "Resetting…" : "Reset free trials"}
+              </button>
+            </div>
             {loading ? (
               <div className="sk-plans-empty">
                 <strong>Loading plans</strong>
