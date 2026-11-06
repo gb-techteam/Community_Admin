@@ -35,6 +35,7 @@ const EXTRA_ORIGINS = String(process.env.CORS_ORIGINS || "")
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
   "http://localhost:5174",
+  "https://superkandle.greenbonds.ae",
   "https://superkandle.greenbondsacademy.com",
   ...EXTRA_ORIGINS,
 ]);
@@ -47,7 +48,9 @@ function isAllowedOrigin(origin) {
     const { hostname } = new URL(normalized);
     return (
       hostname === "greenbondsacademy.com" ||
-      hostname.endsWith(".greenbondsacademy.com")
+      hostname.endsWith(".greenbondsacademy.com") ||
+      hostname === "greenbonds.ae" ||
+      hostname.endsWith(".greenbonds.ae")
     );
   } catch {
     return false;
