@@ -55,6 +55,7 @@ textarea {
   border: none;
   background: linear-gradient(135deg, #1a4a3f, #164035);
   color: #fff;
+  text-decoration: none;
 }
 
 .btn-primary:hover:not(:disabled) {

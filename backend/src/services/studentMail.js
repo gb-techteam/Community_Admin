@@ -272,6 +272,7 @@ export async function sendInvitationFailed({ student, errorMessage }) {
   const detail =
     String(errorMessage || "").trim() ||
     "TradingView could not share the invite.";
+  const updateLink = `${await subscribeUrl()}/update-tradingview`;
 
   const text = `Hi ${name},
 
@@ -280,7 +281,10 @@ Alert: we could not share the SuperKandle TradingView invitation.
 Error: ${detail}
 ${tvUser ? `TradingView ID on file: ${tvUser}` : ""}
 
-Please check this TradingView username and update it if it is wrong, then the academy can try again.`;
+If this username is wrong, verify your student email and update it here:
+${updateLink}
+
+The academy can share the invite again after you save the correct TradingView ID.`;
 
   await sendMail({
     to: student.email,
@@ -288,7 +292,7 @@ Please check this TradingView username and update it if it is wrong, then the ac
     text,
     html: layout(
       "Alert: invitation failed",
-      `<p>Hi ${name},</p>
+      `<p>Hi ${escapeHtml(name)},</p>
        <p><strong>We could not share the SuperKandle TradingView invitation.</strong></p>
        <div style="margin:16px 0;padding:14px 16px;border-radius:12px;background:#fff6f4;border:1px solid #f3d4ce;color:#8a2f24">
          <p style="margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase">Error</p>
@@ -299,7 +303,9 @@ Please check this TradingView username and update it if it is wrong, then the ac
            ? `<p>TradingView ID on file: <strong>${escapeHtml(tvUser)}</strong></p>`
            : ""
        }
-       <p style="color:#667482;font-size:13px">Please check this username. If it is wrong, update it so the invite can be sent again.</p>`
+       <p>If this username is invalid, verify your student email and update the TradingView ID so the invite can be shared again.</p>
+       <p><a href="${escapeHtml(updateLink)}" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#1a4a3f;color:#fff;text-decoration:none;font-weight:600">Update TradingView ID</a></p>
+       <p style="color:#667482;font-size:13px">${escapeHtml(updateLink)}</p>`
     ),
   });
 }
