@@ -92,6 +92,44 @@ function batchesForKind(batches, kind) {
   return batches.filter((batch) => batchKindOf(batch.name) === kind);
 }
 
+const COUNTRY_CODES = [
+  { code: "+91", country: "India" },
+  { code: "+971", country: "United Arab Emirates" },
+  { code: "+966", country: "Saudi Arabia" },
+  { code: "+965", country: "Kuwait" },
+  { code: "+974", country: "Qatar" },
+  { code: "+973", country: "Bahrain" },
+  { code: "+968", country: "Oman" },
+  { code: "+92", country: "Pakistan" },
+  { code: "+880", country: "Bangladesh" },
+  { code: "+94", country: "Sri Lanka" },
+  { code: "+977", country: "Nepal" },
+  { code: "+1", country: "United States / Canada" },
+  { code: "+44", country: "United Kingdom" },
+  { code: "+61", country: "Australia" },
+  { code: "+65", country: "Singapore" },
+  { code: "+60", country: "Malaysia" },
+  { code: "+62", country: "Indonesia" },
+  { code: "+63", country: "Philippines" },
+  { code: "+20", country: "Egypt" },
+  { code: "+234", country: "Nigeria" },
+  { code: "+254", country: "Kenya" },
+  { code: "+27", country: "South Africa" },
+  { code: "+90", country: "Turkey" },
+  { code: "+49", country: "Germany" },
+  { code: "+33", country: "France" },
+  { code: "+39", country: "Italy" },
+  { code: "+34", country: "Spain" },
+  { code: "+31", country: "Netherlands" },
+];
+
+function formatPhone(countryCode, number) {
+  const local = String(number || "")
+    .replace(/[^\d]/g, "")
+    .replace(/^0+/, "");
+  return `${countryCode} ${local}`.trim();
+}
+
 function BatchSelect({
   id,
   kind,
@@ -164,6 +202,7 @@ export default function Subscribe() {
     tradingviewUsername: "",
     note: "",
     batchId: "",
+    countryCode: "",
   });
   const [requestDone, setRequestDone] = useState("");
   const [batches, setBatches] = useState([]);
@@ -256,14 +295,25 @@ export default function Subscribe() {
 
   async function submitRequest(event) {
     event.preventDefault();
+    if (!requestForm.countryCode) {
+      setError("Select a country code before entering your phone number.");
+      return;
+    }
+    const localPhone = String(requestForm.phone || "").replace(/[^\d]/g, "");
+    if (!localPhone) {
+      setError("Enter your phone number.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
+      const { countryCode, ...rest } = requestForm;
       const data = await studentApi("/access-request", {
         method: "POST",
         body: JSON.stringify({
           email,
-          ...requestForm,
+          ...rest,
+          phone: formatPhone(countryCode, requestForm.phone),
           batchId: Number(requestForm.batchId),
         }),
       });
@@ -870,13 +920,33 @@ export default function Subscribe() {
                 onChange={(e) => updateRequest("lastName", e.target.value)}
                 required
               />
-              <label htmlFor="reqPhone">Phone</label>
-              <input
-                id="reqPhone"
-                value={requestForm.phone}
-                onChange={(e) => updateRequest("phone", e.target.value)}
-                required
-              />
+              <label htmlFor="reqCountryCode">Phone</label>
+              <div className="sk-sub__phone">
+                <select
+                  id="reqCountryCode"
+                  value={requestForm.countryCode}
+                  onChange={(e) => updateRequest("countryCode", e.target.value)}
+                  required
+                  aria-label="Country code"
+                >
+                  <option value="">Country code</option>
+                  {COUNTRY_CODES.map((row) => (
+                    <option key={`${row.country}-${row.code}`} value={row.code}>
+                      {row.country} {row.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  id="reqPhone"
+                  type="tel"
+                  inputMode="numeric"
+                  value={requestForm.phone}
+                  onChange={(e) => updateRequest("phone", e.target.value)}
+                  placeholder="Phone number"
+                  disabled={!requestForm.countryCode}
+                  required
+                />
+              </div>
               <label htmlFor="reqDob">Date of birth</label>
               <input
                 id="reqDob"
