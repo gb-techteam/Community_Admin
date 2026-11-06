@@ -206,6 +206,7 @@ textarea {
   display: flex;
   align-items: stretch;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .sk-sub__tv-priority input {
@@ -253,6 +254,20 @@ textarea {
   background: #f4f7f5;
   color: #10231f;
   cursor: default;
+}
+
+.sk-sub__lock-value {
+  flex: 1;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  border: 1.5px solid #d7e0ea;
+  border-radius: 12px;
+  background: #f4f7f5;
+  color: #10231f;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .sk-sub__tv-priority-hint {

@@ -291,9 +291,14 @@ router.get("/session", requireStudent, async (req, res) => {
   }
 });
 
+function positiveId(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 async function activateSelectedPlan(studentId, { planId, paymentId }) {
-  const payId = Number(paymentId);
-  if (Number.isFinite(payId)) {
+  const payId = positiveId(paymentId);
+  if (payId) {
     const order = await loadCheckoutOrder(payId, studentId);
     if (!order || order.status !== "confirmed") {
       const error = new Error(
@@ -318,7 +323,7 @@ async function activateSelectedPlan(studentId, { planId, paymentId }) {
     return;
   }
 
-  const selectedPlanId = Number(planId);
+  const selectedPlanId = positiveId(planId);
   const plan = await getActivePlan(selectedPlanId);
   if (!plan?.is_trial) {
     const error = new Error("Select a plan again");

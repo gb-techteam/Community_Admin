@@ -362,8 +362,12 @@ export default function Subscribe() {
           batchId: Number(batchId),
           tradingviewUsername: tvDraft,
           confirmBatch: true,
-          planId: pending?.planId || null,
-          paymentId: pending?.paymentId || null,
+          ...(pending?.kind === "trial" && pending?.planId
+            ? { planId: pending.planId }
+            : {}),
+          ...(pending?.kind === "usdt" && pending?.paymentId
+            ? { paymentId: pending.paymentId }
+            : {}),
         }),
       });
       setStudent(data.student);
@@ -764,10 +768,8 @@ export default function Subscribe() {
                 <div className="sk-sub__lock-field">
                   <label htmlFor="confirmBatchLocked">Batch</label>
                   <div className="sk-sub__tv-priority-row">
-                    <input
-                      id="confirmBatchLocked"
-                      readOnly
-                      value={[
+                    <div id="confirmBatchLocked" className="sk-sub__lock-value">
+                      {[
                         { gcc: "GCC", online: "Online", offline: "Offline" }[
                           batchKind
                         ],
@@ -776,7 +778,7 @@ export default function Subscribe() {
                       ]
                         .filter(Boolean)
                         .join(" · ")}
-                    />
+                    </div>
                     <button
                       type="button"
                       className="sk-sub__tv-edit"
@@ -807,6 +809,16 @@ export default function Subscribe() {
                 disabled={busy || !batchId || !tvDraft.trim()}
               >
                 {busy ? "Saving…" : "Confirm and continue"}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  setError("");
+                  setStep("plans");
+                }}
+              >
+                Back to plans
               </button>
             </form>
           </>
