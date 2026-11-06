@@ -2,6 +2,10 @@ import express from "express";
 import pool from "../config/db.js";
 import { requireAuth, requireAnyPower } from "../middleware/auth.js";
 import { assignStudentBatch } from "../services/superkandleAccess.js";
+import {
+  sendMembershipMailSafe,
+  sendStudentRequestApproved,
+} from "../services/studentMail.js";
 
 const router = express.Router();
 
@@ -139,6 +143,15 @@ router.patch("/:id/approve", async (req, res) => {
       WHERE id = $3
       `,
       [studentId, reviewer, existing.id]
+    );
+
+    await sendMembershipMailSafe(() =>
+      sendStudentRequestApproved({
+        student: {
+          first_name: existing.first_name,
+          email: existing.email,
+        },
+      })
     );
 
     res.json({

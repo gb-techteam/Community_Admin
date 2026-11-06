@@ -63,10 +63,10 @@ async function sendMail({ to, subject, text, html }) {
   });
 }
 
-function layout(title, bodyHtml) {
+function layout(title, bodyHtml, brand = "SuperKandle") {
   return `<div style="font-family:Inter,Arial,sans-serif;background:#f4f7fb;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e7edf3;border-radius:16px;padding:24px 28px;color:#1b2430">
-    <p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8b97a3">SuperKandle</p>
+    <p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8b97a3">${brand}</p>
     <h1 style="margin:0 0 16px;font-size:22px;font-weight:600">${title}</h1>
     ${bodyHtml}
   </div>
@@ -83,6 +83,38 @@ function escapeHtml(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+export async function sendStudentRequestApproved({ student }) {
+  const name = firstName(student);
+  const email = String(student?.email || "").trim();
+  if (!email) throw new Error("Student has no email");
+  const link = await subscribeUrl();
+
+  const text = `Hi ${name},
+
+Academy management has approved your student request.
+
+You can now access all Wealth Club products.
+
+You can also take SuperKandle plans here:
+${link}`;
+
+  await sendMail({
+    to: email,
+    subject: "Your Greenbonds student request is approved",
+    text,
+    html: layout(
+      "Student request approved",
+      `<p>Hi ${escapeHtml(name)},</p>
+       <p>Academy management has approved your student request.</p>
+       <p>You can now access all Wealth Club products.</p>
+       <p>You can also take SuperKandle plans from the subscribe page:</p>
+       <p><a href="${escapeHtml(link)}" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#1a4a3f;color:#fff;text-decoration:none;font-weight:600">View SuperKandle plans</a></p>
+       <p style="color:#667482;font-size:13px">${escapeHtml(link)}</p>`,
+      "Greenbonds"
+    ),
+  });
 }
 
 export async function sendStudentOtp(email, code) {

@@ -65,6 +65,12 @@ const managementLinks = [
     show: () => hasAnyPower(["manage_students"]),
   },
   {
+    to: "/dashboard/student-requests",
+    label: "Student requests",
+    icon: ClipboardList,
+    show: () => hasAnyPower(["manage_students", "manage_superkandle"]),
+  },
+  {
     to: "/dashboard/courses",
     label: "Courses",
     icon: BookOpen,

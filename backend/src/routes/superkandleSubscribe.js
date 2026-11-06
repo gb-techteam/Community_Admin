@@ -291,6 +291,56 @@ router.get("/session", requireStudent, async (req, res) => {
   }
 });
 
+async function activateSelectedPlan(studentId, { planId, paymentId }) {
+  const payId = Number(paymentId);
+  if (Number.isFinite(payId)) {
+    const order = await loadCheckoutOrder(payId, studentId);
+    if (!order || order.status !== "confirmed") {
+      const error = new Error(
+        "Payment is not confirmed yet. Complete payment first."
+      );
+      error.status = 400;
+      throw error;
+    }
+    await activateMembership({
+      studentId,
+      plan: {
+        id: order.plan_id,
+        duration_value: order.duration_value,
+        duration_months: order.duration_months,
+        duration_unit: order.duration_unit,
+      },
+      amount: Number(order.amount),
+      paymentStatus: "paid",
+      paymentMethod: "USDT-BEP20",
+      paymentNote: order.tx_hash ? `tx ${order.tx_hash}` : `payment ${order.id}`,
+    });
+    return;
+  }
+
+  const selectedPlanId = Number(planId);
+  const plan = await getActivePlan(selectedPlanId);
+  if (!plan?.is_trial) {
+    const error = new Error("Select a plan again");
+    error.status = 400;
+    throw error;
+  }
+  if (await hasUsedTrial(studentId)) {
+    const error = new Error("You already used your free trial");
+    error.status = 409;
+    throw error;
+  }
+  await markTrialClaimed(studentId);
+  await activateMembership({
+    studentId,
+    plan,
+    amount: 0,
+    paymentStatus: "paid",
+    paymentMethod: "free_trial",
+    paymentNote: "Student self-serve free trial",
+  });
+}
+
 router.patch("/profile", requireStudent, async (req, res) => {
   try {
     const studentId = req.student.studentId;
@@ -302,11 +352,22 @@ router.patch("/profile", requireStudent, async (req, res) => {
     if (req.body.tradingviewUsername != null) {
       await saveTradingviewUsername(studentId, req.body.tradingviewUsername);
     }
-    const student = await loadPublicStudent(studentId);
     if (req.body.confirmBatch) {
+      const current = await membershipFor(studentId);
+      if (!current?.plan_id) {
+        await activateSelectedPlan(studentId, {
+          planId: req.body.planId,
+          paymentId: req.body.paymentId,
+        });
+      }
       await notifyMembershipActivatedOnce(studentId);
     }
-    res.json({ success: true, student });
+    const student = await loadPublicStudent(studentId);
+    res.json({
+      success: true,
+      student,
+      membership: await membershipFor(studentId),
+    });
   } catch (error) {
     httpError(res, error, "Could not save details");
   }
@@ -401,20 +462,16 @@ router.post("/start", requireStudent, async (req, res) => {
         });
       }
 
-      await markTrialClaimed(studentId);
-      const membership = await activateMembership({
-        studentId,
-        plan,
-        amount: 0,
-        paymentStatus: "paid",
-        paymentMethod: "free_trial",
-        paymentNote: "Student self-serve free trial",
-      });
       return res.json({
         success: true,
         kind: "trial",
-        membership: await membershipFor(studentId),
-        message: "Free trial is now active",
+        plan: {
+          id: plan.id,
+          name: plan.name,
+          durationValue: plan.duration_value,
+          durationUnit: plan.duration_unit,
+        },
+        message: "Confirm your TradingView ID and batch to start the trial",
       });
     }
 
@@ -485,6 +542,7 @@ async function loadCheckoutOrder(paymentId, studentId) {
       p.plan_id,
       p.amount,
       p.status,
+      p.tx_hash,
       p.created_at,
       sp.name AS plan_name,
       sp.is_trial,
@@ -571,23 +629,12 @@ router.post("/confirm", requireStudent, async (req, res) => {
       [txHash, order.id]
     );
 
-    const membership = await activateMembership({
-      studentId,
-      plan: {
-        id: order.plan_id,
-        duration_value: order.duration_value,
-        duration_months: order.duration_months,
-        duration_unit: order.duration_unit,
-      },
-      amount: Number(order.amount),
-      paymentStatus: "paid",
-      paymentMethod: "USDT-BEP20",
-      paymentNote: `tx ${txHash}`,
-    });
     res.json({
       success: true,
-      membership: await membershipFor(studentId),
-      message: "Payment confirmed. SuperKandle access is active.",
+      paymentId: order.id,
+      planId: order.plan_id,
+      membership: null,
+      message: "Payment confirmed. Confirm your details to activate SuperKandle.",
     });
   } catch (error) {
     if (error.code === "23505") {
