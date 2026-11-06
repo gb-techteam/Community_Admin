@@ -6,6 +6,7 @@ import {
   Copy,
   Gift,
   KeyRound,
+  Pencil,
   ShieldCheck,
   Sparkles,
   Wallet,
@@ -63,6 +64,7 @@ function PaymentQr({ wallet, amount, contract }) {
 }
 
 const TOKEN_KEY = "sk_student_token";
+const PENDING_KEY = "sk_pending_checkout";
 
 function durationLabel(value, unit = "month") {
   const n = Number(value) || 1;
@@ -170,6 +172,15 @@ export default function Subscribe() {
   const [requestBatchKind, setRequestBatchKind] = useState("");
   const [tvDraft, setTvDraft] = useState("");
   const [tvConfirmed, setTvConfirmed] = useState(false);
+  const [tvLocked, setTvLocked] = useState(true);
+  const [batchLocked, setBatchLocked] = useState(true);
+  const [pendingCheckout, setPendingCheckout] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null");
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
     studentApi("/batches")
@@ -301,6 +312,11 @@ export default function Subscribe() {
   function goToConfirm(nextStudent = student) {
     prefillConfirm(nextStudent);
     setTvConfirmed(false);
+    setTvLocked(Boolean(nextStudent?.tradingviewUsername));
+    const known = (nextStudent?.batches || []).find(
+      (row) => !/i\s*don'?t\s*know/i.test(row.name || "")
+    );
+    setBatchLocked(Boolean(known?.id));
     setStep("confirm");
   }
 
@@ -331,6 +347,14 @@ export default function Subscribe() {
     setBusy(true);
     setError("");
     try {
+      let pending = pendingCheckout;
+      if (!pending) {
+        try {
+          pending = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null");
+        } catch {
+          pending = null;
+        }
+      }
       const data = await studentApi("/profile", {
         token,
         method: "PATCH",
@@ -338,11 +362,16 @@ export default function Subscribe() {
           batchId: Number(batchId),
           tradingviewUsername: tvDraft,
           confirmBatch: true,
+          planId: pending?.planId || null,
+          paymentId: pending?.paymentId || null,
         }),
       });
       setStudent(data.student);
       setTvDraft(data.student.tradingviewUsername || tvDraft);
       setTvConfirmed(true);
+      if (data.membership) setMembership(data.membership);
+      sessionStorage.removeItem(PENDING_KEY);
+      setPendingCheckout(null);
       setStep("done");
     } catch (err) {
       setError(err.message);
@@ -366,9 +395,9 @@ export default function Subscribe() {
         body: JSON.stringify({ planId: plan.id }),
       });
       if (data.kind === "trial") {
-        setMembership(data.membership);
-        setTrialUsed(true);
-        setPlans((current) => current.filter((row) => !row.is_trial));
+        const pending = { kind: "trial", planId: plan.id };
+        setPendingCheckout(pending);
+        sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
         goToConfirm(student);
         return;
       }
@@ -394,7 +423,13 @@ export default function Subscribe() {
           txHash,
         }),
       });
-      setMembership(data.membership);
+      const pending = {
+        kind: "usdt",
+        paymentId: data.paymentId,
+        planId: checkout?.plan?.id || data.planId,
+      };
+      setPendingCheckout(pending);
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
       goToConfirm(student);
     } catch (err) {
       setError(err.message);
@@ -685,29 +720,87 @@ export default function Subscribe() {
             </p>
             <h1>Confirm your details</h1>
             <p className="sk-sub__lead">
-              Check your batch and TradingView ID before we share the invite.
-              Access is not shown as ready until these are confirmed.
+              The SuperKandle invite is shared to this TradingView ID. It must
+              match the username you use to log in to TradingView.
             </p>
             <form className="sk-sub__form" onSubmit={confirmDetails}>
-              <BatchSelect
-                id="confirmBatch"
-                kind={batchKind}
-                batchId={batchId}
-                batches={batches}
-                onKindChange={(next) => {
-                  setBatchKind(next);
-                  setBatchId("");
-                }}
-                onBatchChange={setBatchId}
-              />
-              <label htmlFor="confirmTv">TradingView ID</label>
-              <input
-                id="confirmTv"
-                value={tvDraft}
-                onChange={(e) => setTvDraft(e.target.value)}
-                placeholder="TradingView username"
-                required
-              />
+              <div className="sk-sub__tv-priority">
+                <div className="sk-sub__tv-priority-head">
+                  <KeyRound size={16} aria-hidden="true" />
+                  <label htmlFor="confirmTv">TradingView ID</label>
+                </div>
+                <div className="sk-sub__tv-priority-row">
+                  <input
+                    id="confirmTv"
+                    value={tvDraft}
+                    onChange={(e) => setTvDraft(e.target.value)}
+                    placeholder="Exact TradingView username"
+                    autoComplete="off"
+                    spellCheck="false"
+                    readOnly={tvLocked}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="sk-sub__tv-edit"
+                    onClick={() => {
+                      setTvLocked(false);
+                      requestAnimationFrame(() => {
+                        document.getElementById("confirmTv")?.focus();
+                      });
+                    }}
+                    aria-label="Edit TradingView ID"
+                    title="Edit TradingView ID"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </div>
+                <p className="sk-sub__tv-priority-hint">
+                  Double-check this ID. If it is wrong, the invite will go to
+                  the wrong TradingView account and you will not see SuperKandle.
+                </p>
+              </div>
+              {batchLocked && batchId ? (
+                <div className="sk-sub__lock-field">
+                  <label htmlFor="confirmBatchLocked">Batch</label>
+                  <div className="sk-sub__tv-priority-row">
+                    <input
+                      id="confirmBatchLocked"
+                      readOnly
+                      value={[
+                        { gcc: "GCC", online: "Online", offline: "Offline" }[
+                          batchKind
+                        ],
+                        batches.find((row) => String(row.id) === String(batchId))
+                          ?.name,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    />
+                    <button
+                      type="button"
+                      className="sk-sub__tv-edit"
+                      onClick={() => setBatchLocked(false)}
+                      aria-label="Edit batch"
+                      title="Edit batch"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <BatchSelect
+                  id="confirmBatch"
+                  kind={batchKind}
+                  batchId={batchId}
+                  batches={batches}
+                  onKindChange={(next) => {
+                    setBatchKind(next);
+                    setBatchId("");
+                  }}
+                  onBatchChange={setBatchId}
+                />
+              )}
               <button
                 type="submit"
                 className="btn-primary"
@@ -732,9 +825,10 @@ export default function Subscribe() {
                 : ""}
               . The TradingView invitation will be shared within 1–2 hours.
             </p>
-            <p className="sk-sub__note">
-              Invite will go to TradingView ID{" "}
-              <strong>{student?.tradingviewUsername || tvDraft}</strong>.
+            <p className="sk-sub__note sk-sub__note--tv">
+              Invite will go only to this TradingView ID:{" "}
+              <strong>{student?.tradingviewUsername || tvDraft}</strong>. Confirm
+              you can log in to TradingView with this exact username.
             </p>
           </div>
         ) : null}

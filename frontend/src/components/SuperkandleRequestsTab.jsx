@@ -67,7 +67,8 @@ export default function SuperkandleRequestsTab({ onStats }) {
       });
       notify({
         title: "Request approved",
-        message: "They can now use this email on the subscribe page.",
+        message:
+          "They were emailed. They can access Wealth Club products and take SuperKandle plans.",
       });
       setSelected(null);
       await load(status);

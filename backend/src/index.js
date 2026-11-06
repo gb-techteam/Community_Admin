@@ -69,6 +69,7 @@ app.use("/uploads", express.static(UPLOADS_ROOT, { maxAge: "7d" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/students", studentRoutes);
+app.use("/api/student-requests", studentRequestRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/batches", batchRoutes);
 app.use("/api/channels", channelRoutes);
