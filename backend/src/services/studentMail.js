@@ -39,28 +39,126 @@ function mailFrom(settings) {
   };
 }
 
+export const EMAIL_DAILY_LIMIT_MESSAGE =
+  "Daily limit reached. Please try again after some time.";
+
+export class StudentMailError extends Error {
+  constructor(message, { status = 503, cause, code } = {}) {
+    super(message);
+    this.status = status;
+    this.cause = cause;
+    this.code = code;
+  }
+}
+
+function errorBlob(error) {
+  return `${error?.message || ""} ${error?.response || ""} ${error?.code || ""} ${error?.responseCode || ""}`.toLowerCase();
+}
+
+function isDailyLimitError(error) {
+  const blob = errorBlob(error);
+  return (
+    blob.includes("quota") ||
+    blob.includes("daily sending") ||
+    blob.includes("daily user sending") ||
+    blob.includes("sending quota exceeded") ||
+    blob.includes("5.4.5") ||
+    blob.includes("user sending") ||
+    blob.includes("too many messages") ||
+    blob.includes("rate limit") ||
+    blob.includes("try again later") && blob.includes("4.7.0")
+  );
+}
+
+function dailyLimitError() {
+  return new StudentMailError(EMAIL_DAILY_LIMIT_MESSAGE, {
+    status: 503,
+    code: "EMAIL_DAILY_LIMIT",
+  });
+}
+
+function studentMailMessage(error) {
+  if (isDailyLimitError(error)) return EMAIL_DAILY_LIMIT_MESSAGE;
+  const blob = errorBlob(error);
+  if (
+    blob.includes("eauth") ||
+    blob.includes("invalid login") ||
+    blob.includes("username and password") ||
+    blob.includes("bad credentials")
+  ) {
+    return "The academy email sender is not accepting login. Please contact the academy.";
+  }
+  if (
+    blob.includes("etimedout") ||
+    blob.includes("econnection") ||
+    blob.includes("esocket") ||
+    blob.includes("timeout")
+  ) {
+    return "Could not send the verification email. Try again in a minute.";
+  }
+  return "Could not send the verification email. Check spam, or try again in a minute.";
+}
+
+let quotaBlockedUntil = 0;
+
+let cachedTransport = null;
+let cachedTransportKey = "";
+
+function getTransport(settings) {
+  const port = Number(settings.smtpPort || 587);
+  const key = `${settings.smtpHost}|${port}|${settings.smtpUser}|${settings.smtpPass}`;
+  if (cachedTransport && cachedTransportKey === key) return cachedTransport;
+  if (cachedTransport) {
+    cachedTransport.close();
+    cachedTransport = null;
+  }
+  cachedTransportKey = key;
+  cachedTransport = nodemailer.createTransport({
+    host: settings.smtpHost,
+    port,
+    secure: String(port) === "465",
+    requireTLS: port === 587,
+    pool: true,
+    maxConnections: 2,
+    maxMessages: 40,
+    connectionTimeout: 12_000,
+    greetingTimeout: 12_000,
+    socketTimeout: 20_000,
+    auth: {
+      user: settings.smtpUser,
+      pass: String(settings.smtpPass || "").trim(),
+    },
+  });
+  return cachedTransport;
+}
+
 async function sendMail({ to, subject, text, html }) {
   const settings = await loadSettings();
   if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPass) {
-    throw new Error("Email is not configured");
+    throw new StudentMailError(
+      "Email OTP is not configured yet. Ask the academy to set SMTP so a code can be sent to your email."
+    );
+  }
+  if (Date.now() < quotaBlockedUntil) {
+    throw dailyLimitError();
   }
   const from = mailFrom(settings);
-  const transporter = nodemailer.createTransport({
-    host: settings.smtpHost,
-    port: Number(settings.smtpPort || 587),
-    secure: String(settings.smtpPort || "587") === "465",
-    auth: {
-      user: settings.smtpUser,
-      pass: settings.smtpPass,
-    },
-  });
-  await transporter.sendMail({
-    from,
-    to,
-    subject,
-    text,
-    html,
-  });
+  try {
+    await getTransport(settings).sendMail({
+      from,
+      to,
+      subject,
+      text,
+      html,
+    });
+  } catch (error) {
+    console.error("SMTP send error:", error.message, error.code || "", error.response || "");
+    if (isDailyLimitError(error)) {
+      quotaBlockedUntil = Date.now() + 6 * 60 * 60 * 1000;
+      throw dailyLimitError();
+    }
+    throw new StudentMailError(studentMailMessage(error), { cause: error });
+  }
 }
 
 function layout(title, bodyHtml, brand = "SuperKandle") {

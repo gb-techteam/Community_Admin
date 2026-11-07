@@ -21,17 +21,20 @@ function fullName(first, last) {
 export default function SuperkandleRequestsTab({ onStats }) {
   const { confirm, notify } = useFeedback();
   const [status, setStatus] = useState("pending");
+  const [search, setSearch] = useState("");
   const [requests, setRequests] = useState([]);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function load(nextStatus = status) {
+  async function load(nextStatus = status, query = search) {
     setLoading(true);
     setError("");
     try {
-      const data = await api(`/api/student-requests?status=${nextStatus}`);
+      const params = new URLSearchParams({ status: nextStatus });
+      if (query.trim()) params.set("search", query.trim());
+      const data = await api(`/api/student-requests?${params.toString()}`);
       setRequests(data.requests || []);
       setStats(data.stats || stats);
       onStats?.(data.stats || { pending: 0 });
@@ -106,23 +109,43 @@ export default function SuperkandleRequestsTab({ onStats }) {
       <div className="sk-roster__head">
         <div>
           <h2>Requests</h2>
-          <p>Filter by status and open a row to review the details they submitted.</p>
+          <p>Search by name or contact, then open a row to review the details they submitted.</p>
         </div>
-        <div className="filter-bar__select">
-          <label htmlFor="skReqStatus">Status</label>
-          <select
-            id="skReqStatus"
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              load(e.target.value);
-            }}
-          >
-            <option value="pending">Pending ({stats.pending || 0})</option>
-            <option value="approved">Approved ({stats.approved || 0})</option>
-            <option value="rejected">Rejected ({stats.rejected || 0})</option>
-            <option value="all">All</option>
-          </select>
+        <div className="sk-roster__filters">
+          <div className="filter-bar__search">
+            <input
+              type="search"
+              placeholder="Search name, email, phone, Telegram, TradingView, or batch"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") load(status, e.target.value);
+              }}
+            />
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => load(status, search)}
+            >
+              Search
+            </button>
+          </div>
+          <div className="filter-bar__select">
+            <label htmlFor="skReqStatus">Status</label>
+            <select
+              id="skReqStatus"
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                load(e.target.value, search);
+              }}
+            >
+              <option value="pending">Pending ({stats.pending || 0})</option>
+              <option value="approved">Approved ({stats.approved || 0})</option>
+              <option value="rejected">Rejected ({stats.rejected || 0})</option>
+              <option value="all">All</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -224,7 +247,9 @@ export default function SuperkandleRequestsTab({ onStats }) {
             ) : requests.length === 0 ? (
               <tr>
                 <td colSpan={7} className="table-empty">
-                  No {status === "all" ? "" : status} requests
+                  {search.trim()
+                    ? "No matching requests"
+                    : `No ${status === "all" ? "" : status} requests`}
                 </td>
               </tr>
             ) : (
