@@ -28,12 +28,29 @@ async function loadAccessRequest(id) {
 router.get("/", async (req, res) => {
   try {
     const status = String(req.query.status || "pending").toLowerCase();
+    const search = String(req.query.search || "").trim();
     const params = [];
-    let where = "";
+    const filters = [];
     if (["pending", "approved", "rejected"].includes(status)) {
       params.push(status);
-      where = `WHERE r.status = $1`;
+      filters.push(`r.status = $${params.length}`);
     }
+    if (search) {
+      params.push(`%${search}%`);
+      filters.push(`
+        (
+          r.first_name ILIKE $${params.length}
+          OR r.last_name ILIKE $${params.length}
+          OR CONCAT(r.first_name, ' ', r.last_name) ILIKE $${params.length}
+          OR r.email ILIKE $${params.length}
+          OR r.phone ILIKE $${params.length}
+          OR r.telegram_user ILIKE $${params.length}
+          OR r.tradingview_username ILIKE $${params.length}
+          OR b.name ILIKE $${params.length}
+        )
+      `);
+    }
+    const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
 
     const result = await pool.query(
       `

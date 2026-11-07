@@ -26,6 +26,7 @@ import {
   refreshAdmin,
 } from "../lib/auth";
 import { useFeedback } from "../lib/feedback";
+import { api } from "../lib/api";
 
 const managementLinks = [
   {
@@ -129,7 +130,12 @@ function NavGroup({ label, links, onNavigate }) {
               }
             >
               <Icon size={18} strokeWidth={2} aria-hidden="true" />
-              <span>{link.label}</span>
+              <span className="portal-nav__text">{link.label}</span>
+              {link.badge > 0 ? (
+                <span className="portal-nav__badge">
+                  {link.badge > 99 ? "99+" : link.badge}
+                </span>
+              ) : null}
             </NavLink>
           );
         })}
@@ -152,6 +158,11 @@ function TopNavLinks({ links }) {
       >
         <Icon size={16} strokeWidth={2} aria-hidden="true" />
         <span>{link.label}</span>
+        {link.badge > 0 ? (
+          <span className="portal-nav__badge">
+            {link.badge > 99 ? "99+" : link.badge}
+          </span>
+        ) : null}
       </NavLink>
     );
   });
@@ -162,7 +173,15 @@ export default function DashboardLayout() {
   const location = useLocation();
   const { confirm, notify } = useFeedback();
   const admin = getAdmin();
-  const management = managementLinks.filter((link) => link.show());
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const canSeeRequests = hasAnyPower(["manage_students", "manage_superkandle"]);
+  const management = managementLinks
+    .filter((link) => link.show())
+    .map((link) =>
+      link.to === "/dashboard/student-requests"
+        ? { ...link, badge: pendingRequests }
+        : link
+    );
   const products = productLinks.filter((link) => link.show());
   const isChannelChat = /^\/dashboard\/channels\/[^/]+$/.test(location.pathname);
 
@@ -191,6 +210,29 @@ export default function DashboardLayout() {
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!canSeeRequests) return undefined;
+    let cancelled = false;
+
+    async function loadPending() {
+      try {
+        const data = await api("/api/student-requests?status=pending");
+        if (!cancelled) {
+          setPendingRequests(Number(data.stats?.pending) || 0);
+        }
+      } catch {
+        if (!cancelled) setPendingRequests(0);
+      }
+    }
+
+    loadPending();
+    const timer = setInterval(loadPending, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [canSeeRequests, location.pathname]);
 
   // Keep channel chat inside the visible mobile viewport
   useEffect(() => {

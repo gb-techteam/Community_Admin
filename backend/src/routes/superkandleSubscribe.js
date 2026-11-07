@@ -134,7 +134,7 @@ router.post("/request-otp", async (req, res) => {
 
     const recent = await pool.query(
       `
-      SELECT created_at
+      SELECT created_at, expires_at
       FROM superkandle_student_otps
       WHERE student_id = $1
       ORDER BY created_at DESC
@@ -142,17 +142,21 @@ router.post("/request-otp", async (req, res) => {
       `,
       [student.id]
     );
-    if (recent.rows[0]) {
-      const ageMs = Date.now() - new Date(recent.rows[0].created_at).getTime();
-      if (ageMs < 60_000) {
-        return res.status(429).json({
-          success: false,
-          message: "Wait a minute before requesting another code",
+    const last = recent.rows[0];
+    if (last && new Date(last.expires_at) > new Date()) {
+      const ageMs = Date.now() - new Date(last.created_at).getTime();
+      if (ageMs < 3 * 60 * 1000) {
+        return res.json({
+          success: true,
+          method: "otp",
+          message:
+            "We already sent a 6-digit code to your student email. Check inbox and spam.",
         });
       }
     }
 
     const code = String(crypto.randomInt(100000, 1000000));
+    await sendStudentOtp(email, code);
     await pool.query(
       `
       INSERT INTO superkandle_student_otps (student_id, email, code_hash, expires_at)
@@ -161,8 +165,6 @@ router.post("/request-otp", async (req, res) => {
       [student.id, email, hashCode(code)]
     );
 
-    await sendStudentOtp(email, code);
-
     res.json({
       success: true,
       method: "otp",
@@ -170,9 +172,14 @@ router.post("/request-otp", async (req, res) => {
     });
   } catch (error) {
     console.error("Subscribe request OTP error:", error.message);
-    res.status(500).json({
+    const status = Number(error.status) || 500;
+    res.status(status).json({
       success: false,
-      message: "Could not start verification",
+      code: error.code || undefined,
+      message:
+        error.message && status !== 500
+          ? error.message
+          : "Could not start verification",
     });
   }
 });
