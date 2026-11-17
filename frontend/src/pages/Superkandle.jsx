@@ -189,6 +189,20 @@ export default function Superkandle() {
   }, []);
 
   useEffect(() => {
+    const delay = search.trim() ? 280 : 0;
+    const timer = setTimeout(() => {
+      loadRef.current(
+        search,
+        statusFilter,
+        expiryFilter,
+        paymentFilter,
+        sharedFilter
+      );
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     const stopSocket = connectSuperkandleSocket((event) => {
       const member = event?.member;
       if (member?.id) {

@@ -31,6 +31,28 @@ const DURATION_SUGGESTIONS = {
   month: [1, 3, 6, 12],
 };
 
+function likeContains(value) {
+  return `%${String(value)
+    .replace(/!/g, "!!")
+    .replace(/%/g, "!%")
+    .replace(/_/g, "!_")}%`;
+}
+
+function personSearchClause(paramIndex, { includePlan = false } = {}) {
+  return `
+    (
+      s.first_name ILIKE $${paramIndex} ESCAPE '!'
+      OR s.last_name ILIKE $${paramIndex} ESCAPE '!'
+      OR s.email ILIKE $${paramIndex} ESCAPE '!'
+      OR s.phone ILIKE $${paramIndex} ESCAPE '!'
+      OR CONCAT(s.first_name, ' ', s.last_name) ILIKE $${paramIndex} ESCAPE '!'
+      OR s.tradingview_username ILIKE $${paramIndex} ESCAPE '!'
+      OR REPLACE(COALESCE(s.tradingview_username, ''), '@', '') ILIKE $${paramIndex} ESCAPE '!'
+      ${includePlan ? `OR p.name ILIKE $${paramIndex} ESCAPE '!'` : ""}
+    )
+  `;
+}
+
 function approxDurationMonths(value, unit) {
   if (unit === "day") return Math.max(1, Math.ceil(value / 30));
   if (unit === "week") return Math.max(1, Math.ceil(value / 4));
@@ -534,18 +556,8 @@ router.get("/", async (req, res) => {
     const filters = [];
 
     if (search) {
-      params.push(`%${search}%`);
-      filters.push(`
-        (
-          s.first_name ILIKE $${params.length}
-          OR s.last_name ILIKE $${params.length}
-          OR s.email ILIKE $${params.length}
-          OR s.phone ILIKE $${params.length}
-          OR CONCAT(s.first_name, ' ', s.last_name) ILIKE $${params.length}
-          OR s.tradingview_username ILIKE $${params.length}
-          OR p.name ILIKE $${params.length}
-        )
-      `);
+      params.push(likeContains(search.replace(/^@+/, "")));
+      filters.push(personSearchClause(params.length, { includePlan: true }));
     }
 
     if (status === "active") {
@@ -661,18 +673,8 @@ router.get("/registered", async (req, res) => {
     const filters = [];
 
     if (search) {
-      params.push(`%${search}%`);
-      filters.push(`
-        (
-          s.first_name ILIKE $${params.length}
-          OR s.last_name ILIKE $${params.length}
-          OR s.email ILIKE $${params.length}
-          OR s.phone ILIKE $${params.length}
-          OR s.tradingview_username ILIKE $${params.length}
-          OR CONCAT(s.first_name, ' ', s.last_name) ILIKE $${params.length}
-          OR p.name ILIKE $${params.length}
-        )
-      `);
+      params.push(likeContains(search.replace(/^@+/, "")));
+      filters.push(personSearchClause(params.length, { includePlan: true }));
     }
 
     if (accessShared === "true" || accessShared === "false") {
@@ -834,21 +836,13 @@ router.get("/students-search", async (req, res) => {
     `;
 
     if (search) {
-      params.push(`%${search}%`);
-      where += `
-        AND (
-          s.first_name ILIKE $1
-          OR s.last_name ILIKE $1
-          OR s.email ILIKE $1
-          OR s.phone ILIKE $1
-          OR CONCAT(s.first_name, ' ', s.last_name) ILIKE $1
-        )
-      `;
+      params.push(likeContains(search.replace(/^@+/, "")));
+      where += ` AND ${personSearchClause(1)}`;
     }
 
     const result = await pool.query(
       `
-      SELECT s.id, s.first_name, s.last_name, s.email, s.phone
+      SELECT s.id, s.first_name, s.last_name, s.email, s.phone, s.tradingview_username
       FROM students s
       ${where}
       ORDER BY s.first_name ASC NULLS LAST, s.last_name ASC NULLS LAST, s.id DESC

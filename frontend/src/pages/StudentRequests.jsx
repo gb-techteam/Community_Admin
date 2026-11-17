@@ -12,8 +12,8 @@ export default function StudentRequests() {
           </p>
           <h1>Student requests</h1>
           <p>
-            People who tried to subscribe but are not in the Greenbonds student
-            list yet. Approve to add them as students, or reject.
+            Review people who tried to subscribe but are not in the student list
+            yet.
           </p>
         </div>
       </header>

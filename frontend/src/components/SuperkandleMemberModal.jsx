@@ -577,7 +577,7 @@ export default function SuperkandleMemberModal({
                             id="skStudent"
                             value={studentQuery}
                             onChange={(e) => setStudentQuery(e.target.value)}
-                            placeholder="Search students by name, email, or phone"
+                            placeholder="Search students by name, email, phone, or TradingView"
                             autoComplete="off"
                             autoFocus
                           />
@@ -598,7 +598,11 @@ export default function SuperkandleMemberModal({
                                   )}
                                 </strong>
                                 <span>
-                                  {[student.email, student.phone]
+                                  {[
+                                    student.email,
+                                    student.phone,
+                                    student.tradingview_username,
+                                  ]
                                     .filter(Boolean)
                                     .join(" · ") || "No contact"}
                                 </span>
