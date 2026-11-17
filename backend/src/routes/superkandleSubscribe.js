@@ -720,7 +720,7 @@ router.post("/access-request", async (req, res) => {
       `
       SELECT id
       FROM superkandle_access_requests
-      WHERE LOWER(TRIM(email)) = $1 AND status = 'pending'
+      WHERE LOWER(TRIM(email)) = $1 AND status IN ('pending', 'on_hold')
       LIMIT 1
       `,
       [email]

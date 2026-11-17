@@ -183,6 +183,45 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
+export async function sendStudentRequestRejected({ student, reason }) {
+  const name = firstName(student);
+  const email = String(student?.email || "").trim();
+  if (!email) throw new Error("Student has no email");
+  const why = String(reason || "").trim();
+  if (!why) throw new Error("Rejection reason is required");
+  const link = await subscribeUrl();
+
+  const text = `Hi ${name},
+
+Your Greenbonds student request was not approved.
+
+Reason:
+${why}
+
+If this was a mistake, you can submit a new request here:
+${link}
+
+If you have any concerns or doubts, please connect with the support team by replying to this email.`;
+
+  await sendMail({
+    to: email,
+    subject: "Your Greenbonds student request was not approved",
+    text,
+    html: layout(
+      "Student request not approved",
+      `<p>Hi ${escapeHtml(name)},</p>
+       <p>Academy management could not approve your student request.</p>
+       <p><strong>Reason</strong></p>
+       <p>${escapeHtml(why)}</p>
+       <p>If this was a mistake, you can submit a new request from the subscribe page:</p>
+       <p><a href="${escapeHtml(link)}" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#1a4a3f;color:#fff;text-decoration:none;font-weight:600">Submit another request</a></p>
+       <p style="color:#667482;font-size:13px">${escapeHtml(link)}</p>
+       <p>If you have any concerns or doubts, please connect with the support team by replying to this email.</p>`,
+      "Greenbonds"
+    ),
+  });
+}
+
 export async function sendStudentRequestApproved({ student }) {
   const name = firstName(student);
   const email = String(student?.email || "").trim();
