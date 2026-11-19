@@ -1,18 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
   Check,
-  Clock3,
   Copy,
   Gift,
   KeyRound,
   Pencil,
   ShieldCheck,
-  Sparkles,
+  Tag,
   Wallet,
 } from "lucide-react";
 import { studentApi } from "../lib/api";
-import logo from "../assets/g-black.png";
 
 const USDT_BEP20 = "0x55d398326f99059fF775485246999027B3197955";
 
@@ -130,6 +128,81 @@ function formatPhone(countryCode, number) {
   return `${countryCode} ${local}`.trim();
 }
 
+function studentHello(student) {
+  const name = student?.firstName
+    ? String(student.firstName).toUpperCase()
+    : "there";
+  return `Hi ${name}${student?.email ? ` · ${student.email}` : ""}`;
+}
+
+function OtpFields({ value, onChange, disabled }) {
+  const refs = useRef([]);
+  const digits = value.replace(/\D/g, "").slice(0, 6).split("");
+
+  useEffect(() => {
+    refs.current[0]?.focus();
+  }, []);
+
+  function write(next, focusAt) {
+    const cleaned = next.replace(/\D/g, "").slice(0, 6);
+    onChange(cleaned);
+    refs.current[Math.min(focusAt, 5)]?.focus();
+  }
+
+  function handleChange(index, raw) {
+    const cleaned = raw.replace(/\D/g, "");
+    const chars = digits.slice();
+    if (!cleaned) {
+      chars.splice(index, 1);
+      write(chars.join(""), Math.max(index - 1, 0));
+      return;
+    }
+    if (cleaned.length > 1) {
+      write(chars.join("").slice(0, index) + cleaned, index + cleaned.length);
+      return;
+    }
+    chars[index] = cleaned;
+    write(chars.join(""), index + 1);
+  }
+
+  function handleKeyDown(index, event) {
+    if (event.key !== "Backspace") return;
+    event.preventDefault();
+    const chars = digits.slice();
+    if (chars[index]) {
+      chars.splice(index, 1);
+      write(chars.join(""), index);
+      return;
+    }
+    if (index > 0) {
+      chars.splice(index - 1, 1);
+      write(chars.join(""), index - 1);
+    }
+  }
+
+  return (
+    <div className="sk-otp">
+      {Array.from({ length: 6 }, (_, index) => (
+        <input
+          key={index}
+          ref={(node) => {
+            refs.current[index] = node;
+          }}
+          value={digits[index] || ""}
+          inputMode="numeric"
+          autoComplete={index === 0 ? "one-time-code" : "off"}
+          aria-label={`Digit ${index + 1} of 6`}
+          disabled={disabled}
+          maxLength={index === 0 ? 6 : 1}
+          onChange={(event) => handleChange(index, event.target.value)}
+          onKeyDown={(event) => handleKeyDown(index, event)}
+          onFocus={(event) => event.target.select()}
+        />
+      ))}
+    </div>
+  );
+}
+
 function BatchSelect({
   id,
   kind,
@@ -183,6 +256,7 @@ export default function Subscribe() {
   const [token, setToken] = useState("");
   const [student, setStudent] = useState(null);
   const [plans, setPlans] = useState([]);
+  const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [trialUsed, setTrialUsed] = useState(false);
   const [displayPricedPlans, setDisplayPricedPlans] = useState(true);
   const [membership, setMembership] = useState(null);
@@ -220,6 +294,18 @@ export default function Subscribe() {
       return null;
     }
   });
+
+  useEffect(() => {
+    if (!plans.length) {
+      setSelectedPlanId(null);
+      return;
+    }
+    setSelectedPlanId((current) => {
+      if (plans.some((plan) => plan.id === current)) return current;
+      const trial = plans.find((plan) => plan.is_trial);
+      return (trial || plans[0]).id;
+    });
+  }, [plans]);
 
   useEffect(() => {
     studentApi("/batches")
@@ -503,23 +589,39 @@ export default function Subscribe() {
   }
 
   return (
-    <div className="sk-sub">
+    <div className="sk-sub sk-sub--email">
       <header className="sk-sub__brand">
-        <img src={logo} alt="Goodbook" width={40} height={40} />
-        <div>
-          <p>SuperKandle</p>
-          <strong>Student subscription</strong>
+        <div className="sk-mark" aria-hidden="true">
+          <span>Super</span>
+          <span>Kandle</span>
+        </div>
+        <div className="sk-sub__brand-copy">
+          <p>Superkandle</p>
+          <strong>Student Subscription</strong>
         </div>
       </header>
 
       <main className="sk-sub__card">
-        {step === "email" || step === "code" ? (
+        {step === "email" ? (
           <>
-            <p className="sk-crumb">Verify student access</p>
             <h1>Continue with your academy email</h1>
             <p className="sk-sub__lead">
-              Only enrolled students can take a SuperKandle plan. Paid plans are
-              USDT on BNB Smart Chain (BEP20) only.
+              Only enrolled students can take a SuperKandle plan.
+              <br />
+              Paid plans are USDT on BNB Smart Chain (BEP20) only.
+            </p>
+          </>
+        ) : null}
+
+        {step === "code" ? (
+          <>
+            <h1>
+              Enter the OTP
+              <br />
+              sent to your mail
+            </h1>
+            <p className="sk-sub__lead">
+              6 digit code sent to <span className="sk-otp-mail">{email}</span>
             </p>
           </>
         ) : null}
@@ -533,6 +635,7 @@ export default function Subscribe() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@email.com"
+              inputMode="email"
               required
               autoComplete="email"
             />
@@ -544,17 +647,13 @@ export default function Subscribe() {
 
         {step === "code" ? (
           <form className="sk-sub__form" onSubmit={verify}>
-            <label htmlFor="subCode">6-digit code sent to {email}</label>
-            <input
-              id="subCode"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-            />
-            <button type="submit" className="btn-primary" disabled={busy}>
-              {busy ? "Verifying…" : "Verify"}
+            <OtpFields value={code} onChange={setCode} disabled={busy} />
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={busy || code.replace(/\D/g, "").length !== 6}
+            >
+              {busy ? "Verifying…" : "Continue"}
             </button>
             <button
               type="button"
@@ -566,7 +665,7 @@ export default function Subscribe() {
             </button>
             <button
               type="button"
-              className="btn-ghost"
+              className="sk-link"
               onClick={() => {
                 setStep("email");
                 setCode("");
@@ -580,9 +679,7 @@ export default function Subscribe() {
 
         {step === "batch" ? (
           <>
-            <p className="sk-crumb">
-              Hi {student?.firstName || "there"} · {student?.email}
-            </p>
+            <p className="sk-hello">{studentHello(student)}</p>
             <h1>Select your batch</h1>
             <p className="sk-sub__lead">
               Your profile is on “I don&apos;t know my batch name”. Choose your
@@ -612,88 +709,106 @@ export default function Subscribe() {
         ) : null}
 
         {step === "plans" ? (
-          <>
-            <p className="sk-crumb">
-              Hi {student?.firstName || "there"} · {student?.email}
-            </p>
-            <h1>
-              {!plans.length
-                ? "No offer right now"
-                : !displayPricedPlans
-                  ? "Start with a free trial"
-                  : "Choose a plan"}
-            </h1>
-            <p className="sk-sub__lead">
-              {!plans.length
-                ? "You don't have any offer for taking SuperKandle."
-                : !displayPricedPlans
-                  ? "Take the free trial now. Paid SuperKandle plans will open shortly."
-                  : trialUsed
-                    ? "Your free trial is already used. Pick a paid USDT plan."
-                    : "You can start with one free trial, or pay with USDT (BEP20)."}
-            </p>
+          <div className={plans.length ? "sk-plans-screen" : undefined}>
+            <p className="sk-hello">{studentHello(student)}</p>
             {membership?.is_active && membership.expiry_state !== "expired" ? (
-              <p className="sk-sub__note">
-                Current access: {membership.plan_name || "Active"} until{" "}
-                {String(membership.expires_at || "").slice(0, 10) || "—"}.
-                {displayPricedPlans ? " Paying again renews from today." : ""}
+              <p className="sk-access">
+                Current access - {membership.plan_name || "Active"} until{" "}
+                {String(membership.expires_at || "").slice(0, 10) || "—"}
               </p>
             ) : null}
             {plans.length ? (
-              <div
-                className={`sk-sub__plans ${
-                  !displayPricedPlans ? "sk-sub__plans--offer" : ""
-                }`}
-              >
-                {plans.map((plan) => (
-                  <button
-                    key={plan.id}
-                    type="button"
-                    className={`sk-sub__plan ${
-                      plan.is_trial ? "is-trial" : ""
-                    }`}
-                    disabled={busy}
-                    onClick={() => choosePlan(plan)}
-                  >
-                    {plan.is_trial ? (
-                      <span className="sk-sub__badge">
-                        <Gift size={12} /> Free trial
+              <>
+                <h1>Pick your Plan</h1>
+                <p className="sk-sub__lead">
+                  {!displayPricedPlans
+                    ? "Take the free trial now. Paid plans will open shortly."
+                    : trialUsed
+                      ? "Your free trial is already used. Pick a paid USDT plan."
+                      : "You can start with one free trial, or pay with USDT (BEP20)."}
+                </p>
+                <div className="sk-picks">
+                  {plans.map((plan) => {
+                    const selected = plan.id === selectedPlanId;
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        className={`sk-pick${selected ? " is-selected" : ""}`}
+                        disabled={busy}
+                        aria-pressed={selected}
+                        onClick={() => setSelectedPlanId(plan.id)}
+                      >
+                        <span className="sk-pick__bar">
+                          <span>
+                            {plan.is_trial ? (
+                              <>
+                                <Gift size={16} /> Free Trial
+                              </>
+                            ) : (
+                              moneyUsdt(plan.price)
+                            )}
+                          </span>
+                          {selected ? (
+                            <span className="sk-pick__check" aria-hidden="true">
+                              <Check size={14} strokeWidth={3} />
+                            </span>
+                          ) : null}
+                        </span>
+                        <strong>{plan.name}</strong>
+                        <em>
+                          {plan.is_trial
+                            ? "Free Plan"
+                            : durationLabel(
+                                plan.duration_value,
+                                plan.duration_unit
+                              )}
+                        </em>
+                      </button>
+                    );
+                  })}
+                  {!displayPricedPlans ? (
+                    <div className="sk-pick sk-pick--soon">
+                      <span className="sk-pick__bar">
+                        <span>
+                          <Gift size={16} /> Coming soon
+                        </span>
                       </span>
-                    ) : null}
-                    <strong>{plan.name}</strong>
-                    <em>{moneyUsdt(plan.price)}</em>
-                    <span>
-                      {durationLabel(plan.duration_value, plan.duration_unit)}
-                    </span>
-                    {plan.is_trial ? (
-                      <b className="sk-sub__plan-cta">Start free trial</b>
-                    ) : null}
-                  </button>
-                ))}
-                {!displayPricedPlans ? (
-                  <div className="sk-sub__plan sk-sub__plan--soon">
-                    <span className="sk-sub__badge sk-sub__badge--soon">
-                      <Clock3 size={12} /> Coming soon
-                    </span>
-                    <strong>Paid plans</strong>
-                    <em>Soon</em>
-                    <span>Other priced plans will be coming soon.</span>
-                    <b className="sk-sub__plan-cta is-muted">
-                      <Sparkles size={14} /> Stay tuned
-                    </b>
-                  </div>
-                ) : null}
-              </div>
+                      <strong>Paid Plans</strong>
+                      <em>Other priced plans will be coming soon</em>
+                    </div>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary sk-plans-go"
+                  disabled={busy || selectedPlanId == null}
+                  onClick={() => {
+                    const selected = plans.find(
+                      (plan) => plan.id === selectedPlanId
+                    );
+                    if (selected) choosePlan(selected);
+                  }}
+                >
+                  {busy
+                    ? "Checking…"
+                    : plans.find((plan) => plan.id === selectedPlanId)?.is_trial
+                      ? "Start free trial"
+                      : "Continue"}
+                </button>
+              </>
             ) : (
-              <div className="sk-sub__empty">
-                <Sparkles size={22} strokeWidth={2} />
+              <div className="sk-empty">
+                <Tag size={42} strokeWidth={1.75} />
                 <strong>No SuperKandle offer yet</strong>
                 <span>
-                  Check back later, or ask the academy when the next plan opens.
+                  Check back later, or ask the academy
+                  <br />
+                  when the next plan opens.
                 </span>
               </div>
             )}
-          </>
+          </div>
         ) : null}
 
         {step === "pay" && checkout ? (
@@ -769,9 +884,7 @@ export default function Subscribe() {
 
         {step === "confirm" ? (
           <>
-            <p className="sk-crumb">
-              Hi {student?.firstName || "there"} · {student?.email}
-            </p>
+            <p className="sk-hello">{studentHello(student)}</p>
             <h1>Confirm your details</h1>
             <p className="sk-sub__lead">
               The SuperKandle invite is shared to this TradingView ID. It must
@@ -1073,9 +1186,11 @@ export default function Subscribe() {
         </div>
       ) : null}
 
-      <p className="sk-sub__foot">
-        <KeyRound size={12} /> Student-only checkout · USDT BEP20
-      </p>
+      {step === "code" || (step === "plans" && plans.length) ? null : (
+        <p className="sk-sub__foot">
+          <KeyRound size={19} /> Student-only checkout · USDT BEP20
+        </p>
+      )}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { KeyRound } from "lucide-react";
 import { studentApi } from "../lib/api";
-import logo from "../assets/g-black.png";
 
 const TOKEN_KEY = "sk_tv_update_token";
 
@@ -87,9 +86,12 @@ export default function UpdateTradingview() {
   return (
     <div className="sk-sub">
       <header className="sk-sub__brand">
-        <img src={logo} alt="Goodbook" width={40} height={40} />
+        <div className="sk-mark" aria-hidden="true">
+          <span>Super</span>
+          <span>Kandle</span>
+        </div>
         <div>
-          <p>SuperKandle</p>
+          <p>Superkandle</p>
           <strong>Update TradingView ID</strong>
         </div>
       </header>
