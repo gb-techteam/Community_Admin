@@ -14,6 +14,8 @@ const KEYS = {
 };
 
 let cache = null;
+let cacheAt = 0;
+const CACHE_MS = 4000;
 
 function pick(db, key, envValue = "") {
   const stored = db[KEYS[key]];
@@ -31,11 +33,12 @@ function parseFlag(value, fallback = true) {
 
 export function invalidateSettingsCache() {
   cache = null;
+  cacheAt = 0;
 }
 
 export async function loadSettings() {
   if (cache && !("displayPricedPlans" in cache)) cache = null;
-  if (cache) return cache;
+  if (cache && Date.now() - cacheAt < CACHE_MS) return cache;
 
   const result = await pool.query("SELECT key, value FROM portal_settings");
   const db = Object.fromEntries(
@@ -67,6 +70,7 @@ export async function loadSettings() {
         : 7,
     displayPricedPlans: parseFlag(db[KEYS.displayPricedPlans], true),
   };
+  cacheAt = Date.now();
 
   return cache;
 }
