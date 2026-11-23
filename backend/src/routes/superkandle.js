@@ -8,14 +8,21 @@ import {
   resetAllTrialClaims,
   resetTrialClaim,
 } from "../services/superkandleAccess.js";
-import { receiveWallet } from "../services/bscUsdt.js";
+import { listIncomingUsdtTransfers, receiveWallet } from "../services/bscUsdt.js";
+import { confirmUsdtCheckout } from "../services/superkandleCheckout.js";
 import { loadSettings, saveSettings } from "../services/portalSettings.js";
 import {
   notifyInvitationFailed,
   notifyInvitationShared,
   notifyMembershipActivated,
+  notifyMembershipActivatedOnce,
 } from "../services/superkandleMails.js";
 import { broadcastSuperkandleAccess } from "../realtime/channels.js";
+import {
+  applyTradingviewUsername,
+  queueTradingviewRemoval,
+  VALID_SK_PLAN_SQL,
+} from "../services/tradingviewQueue.js";
 
 const router = express.Router();
 
@@ -332,6 +339,188 @@ router.patch("/checkout-settings", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to save SuperKandle settings",
+    });
+  }
+});
+
+router.get("/payments", async (req, res) => {
+  try {
+    const status = String(req.query.status || "all").toLowerCase();
+    const search = String(req.query.search || "").trim();
+    const params = [];
+    const filters = [];
+    if (["pending", "confirmed", "cancelled"].includes(status)) {
+      params.push(status);
+      filters.push(`p.status = $${params.length}`);
+    }
+    if (search) {
+      params.push(`%${search}%`);
+      filters.push(`
+        (
+          s.first_name ILIKE $${params.length}
+          OR s.last_name ILIKE $${params.length}
+          OR s.email ILIKE $${params.length}
+          OR s.phone ILIKE $${params.length}
+          OR CONCAT(s.first_name, ' ', s.last_name) ILIKE $${params.length}
+          OR p.tx_hash ILIKE $${params.length}
+          OR sp.name ILIKE $${params.length}
+        )
+      `);
+    }
+    const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    const result = await pool.query(
+      `
+      SELECT
+        p.id,
+        p.student_id,
+        p.plan_id,
+        p.amount,
+        p.network,
+        p.token,
+        p.wallet_to,
+        p.tx_hash,
+        p.status,
+        p.created_at,
+        p.confirmed_at,
+        s.first_name,
+        s.last_name,
+        s.email,
+        s.phone,
+        sp.name AS plan_name
+      FROM superkandle_payments p
+      JOIN students s ON s.id = p.student_id
+      LEFT JOIN superkandle_plans sp ON sp.id = p.plan_id
+      ${where}
+      ORDER BY COALESCE(p.confirmed_at, p.created_at) DESC, p.id DESC
+      LIMIT 500
+      `,
+      params
+    );
+    const stats = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+        COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
+        COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
+        COALESCE(SUM(amount) FILTER (WHERE status = 'confirmed'), 0)::float AS confirmed_amount
+      FROM superkandle_payments
+    `);
+    res.json({
+      success: true,
+      payments: result.rows,
+      stats: stats.rows[0],
+    });
+  } catch (error) {
+    console.error("List superkandle payments error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load payment history",
+    });
+  }
+});
+
+router.get("/payments/onchain", async (req, res) => {
+  try {
+    const hours = Number(req.query.hours);
+    const spanHours = Number.isFinite(hours) && hours > 0 ? Math.min(48, hours) : 12;
+    const maxBlocks = Math.round((spanHours * 3600) / 3);
+    const chain = await listIncomingUsdtTransfers({ maxBlocks });
+    if (!chain.ok) {
+      return res.status(503).json({
+        success: false,
+        message: chain.message,
+      });
+    }
+
+    const hashes = chain.transfers.map((row) =>
+      String(row.txHash || "").toLowerCase()
+    );
+    let matched = [];
+    if (hashes.length) {
+      const found = await pool.query(
+        `
+        SELECT
+          p.id,
+          p.status,
+          p.amount,
+          p.tx_hash,
+          s.first_name,
+          s.last_name,
+          s.email
+        FROM superkandle_payments p
+        JOIN students s ON s.id = p.student_id
+        WHERE LOWER(p.tx_hash) = ANY($1::text[])
+        `,
+        [hashes]
+      );
+      matched = found.rows;
+    }
+    const byHash = Object.fromEntries(
+      matched.map((row) => [String(row.tx_hash || "").toLowerCase(), row])
+    );
+
+    res.json({
+      success: true,
+      wallet: chain.wallet,
+      contract: chain.contract,
+      fromBlock: chain.fromBlock,
+      toBlock: chain.toBlock,
+      hours: spanHours,
+      transfers: chain.transfers.map((row) => ({
+        ...row,
+        checkout: byHash[String(row.txHash || "").toLowerCase()] || null,
+      })),
+    });
+  } catch (error) {
+    console.error("On-chain USDT history error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Could not load BNB Smart Chain history",
+    });
+  }
+});
+
+router.post("/payments/:id/verify", async (req, res) => {
+  try {
+    const paymentId = Number(req.params.id);
+    const txHash = String(req.body?.txHash || "").trim();
+    if (!Number.isFinite(paymentId) || paymentId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+    const result = await confirmUsdtCheckout({ paymentId, txHash });
+    if (result.membership && result.paymentId) {
+      const order = await pool.query(
+        "SELECT student_id FROM superkandle_payments WHERE id = $1",
+        [result.paymentId]
+      );
+      const studentId = order.rows[0]?.student_id;
+      if (studentId) {
+        await notifyMembershipActivatedOnce(studentId);
+      }
+    }
+    res.json({
+      success: true,
+      paymentId: result.paymentId,
+      alreadyConfirmed: Boolean(result.alreadyConfirmed),
+      received: result.received,
+      message: result.message,
+    });
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "This transaction was already used",
+      });
+    }
+    const status = Number(error.status) || 500;
+    res.status(status).json({
+      success: false,
+      message:
+        error.message && status !== 500
+          ? error.message
+          : "Could not verify that payment",
     });
   }
 });
@@ -682,6 +871,8 @@ router.get("/registered", async (req, res) => {
     }
     if (accessShared === "false") {
       filters.push("m.access_error = FALSE");
+      filters.push(VALID_SK_PLAN_SQL);
+      filters.push("COALESCE(TRIM(s.tradingview_username), '') <> ''");
     }
 
     const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
@@ -711,14 +902,7 @@ router.patch("/:id/tradingview", async (req, res) => {
     }
 
     const username = String(req.body?.tradingviewUsername || "").trim() || null;
-    await pool.query(
-      `
-      UPDATE students
-      SET tradingview_username = $1, updated_at = NOW()
-      WHERE id = $2
-      `,
-      [username, existing.student_id]
-    );
+    await applyTradingviewUsername(existing.student_id, username);
     await clearMemberAccessError(existing.student_id);
 
     res.json({
@@ -1225,17 +1409,26 @@ router.put("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   try {
-    const result = await pool.query(
-      "DELETE FROM superkandle_members WHERE id = $1 RETURNING id",
-      [req.params.id]
-    );
-
-    if (!result.rows[0]) {
+    const existing = await getMember(req.params.id);
+    if (!existing) {
       return res.status(404).json({
         success: false,
         message: "Superkandle member not found",
       });
     }
+
+    if (existing.tradingview_username) {
+      await queueTradingviewRemoval({
+        studentId: existing.student_id,
+        username: existing.tradingview_username,
+        reason: "member_removed",
+        accessWasShared: Boolean(existing.access_shared),
+      });
+    }
+
+    await pool.query("DELETE FROM superkandle_members WHERE id = $1", [
+      req.params.id,
+    ]);
 
     res.json({ success: true, message: "Superkandle member removed" });
   } catch (error) {

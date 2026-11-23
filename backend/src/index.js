@@ -17,6 +17,7 @@ import portalAdminRoutes from "./routes/portalAdmins.js";
 import adminTypeRoutes from "./routes/adminTypes.js";
 import superkandleRoutes from "./routes/superkandle.js";
 import superkandleSubscribeRoutes from "./routes/superkandleSubscribe.js";
+import tradingviewQueueRoutes from "./routes/tradingviewQueue.js";
 import momentumRoutes from "./routes/momentum.js";
 import settingsRoutes from "./routes/settings.js";
 import { startExpiryMailJob } from "./services/superkandleMails.js";
@@ -80,6 +81,7 @@ app.use("/api/portal-admins", portalAdminRoutes);
 app.use("/api/admin-types", adminTypeRoutes);
 app.use("/api/superkandle/subscribe", superkandleSubscribeRoutes);
 app.use("/api/superkandle", superkandleRoutes);
+app.use("/api/tradingview", tradingviewQueueRoutes);
 app.use("/api/momentum", momentumRoutes);
 app.use("/api/settings", settingsRoutes);
 

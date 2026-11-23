@@ -4,11 +4,11 @@ import jwt from "jsonwebtoken";
 import pool from "../config/db.js";
 import { requireStudent } from "../middleware/studentAuth.js";
 import { sendStudentOtp, smtpReady } from "../services/studentMail.js";
+import { receiveWallet } from "../services/bscUsdt.js";
 import {
-  isTxHash,
-  receiveWallet,
-  verifyUsdtBep20Transfer,
-} from "../services/bscUsdt.js";
+  confirmUsdtCheckout,
+  loadCheckoutOrder,
+} from "../services/superkandleCheckout.js";
 import {
   activateMembership,
   assignStudentBatch,
@@ -314,7 +314,7 @@ async function activateSelectedPlan(studentId, { planId, paymentId }) {
       error.status = 400;
       throw error;
     }
-    await activateMembership({
+    return activateMembership({
       studentId,
       plan: {
         id: order.plan_id,
@@ -327,7 +327,6 @@ async function activateSelectedPlan(studentId, { planId, paymentId }) {
       paymentMethod: "USDT-BEP20",
       paymentNote: order.tx_hash ? `tx ${order.tx_hash}` : `payment ${order.id}`,
     });
-    return;
   }
 
   const selectedPlanId = positiveId(planId);
@@ -365,11 +364,13 @@ router.patch("/profile", requireStudent, async (req, res) => {
       await saveTradingviewUsername(studentId, req.body.tradingviewUsername);
     }
     if (req.body.confirmBatch) {
+      const payId = positiveId(req.body.paymentId);
       const current = await membershipFor(studentId);
-      if (!current?.plan_id) {
+      if (payId) {
+        await activateSelectedPlan(studentId, { paymentId: payId });
+      } else if (!current?.plan_id) {
         await activateSelectedPlan(studentId, {
           planId: req.body.planId,
-          paymentId: req.body.paymentId,
         });
       }
       await notifyMembershipActivatedOnce(studentId);
@@ -496,15 +497,6 @@ router.post("/start", requireStudent, async (req, res) => {
       });
     }
 
-    await pool.query(
-      `
-      UPDATE superkandle_payments
-      SET status = 'cancelled'
-      WHERE student_id = $1 AND status = 'pending'
-      `,
-      [studentId]
-    );
-
     const created = await pool.query(
       `
       INSERT INTO superkandle_payments (
@@ -545,44 +537,12 @@ router.post("/start", requireStudent, async (req, res) => {
   }
 });
 
-async function loadCheckoutOrder(paymentId, studentId) {
-  const pending = await pool.query(
-    `
-    SELECT
-      p.id,
-      p.student_id,
-      p.plan_id,
-      p.amount,
-      p.status,
-      p.tx_hash,
-      p.created_at,
-      sp.name AS plan_name,
-      sp.is_trial,
-      COALESCE(sp.duration_value, sp.duration_months, 1) AS duration_value,
-      COALESCE(sp.duration_months, 1) AS duration_months,
-      COALESCE(NULLIF(sp.duration_unit, ''), 'month') AS duration_unit
-    FROM superkandle_payments p
-    JOIN superkandle_plans sp ON sp.id = p.plan_id
-    WHERE p.id = $1 AND p.student_id = $2
-    `,
-    [paymentId, studentId]
-  );
-  return pending.rows[0] || null;
-}
-
 router.post("/confirm", requireStudent, async (req, res) => {
   try {
     const paymentId = Number(req.body.paymentId);
     const txHash = String(req.body.txHash || "").trim();
     const studentId = req.student.studentId;
     await requireKnownBatch(studentId);
-    const settings = await loadSettings();
-    if (settings.displayPricedPlans === false) {
-      return res.status(403).json({
-        success: false,
-        message: "You don't have any offer for taking SuperKandle",
-      });
-    }
 
     if (!Number.isFinite(paymentId)) {
       return res.status(400).json({
@@ -591,62 +551,19 @@ router.post("/confirm", requireStudent, async (req, res) => {
       });
     }
 
-    const order = await loadCheckoutOrder(paymentId, studentId);
-    if (!order || order.status === "cancelled") {
-      return res.status(404).json({
-        success: false,
-        message: "Payment session not found. Select a plan again.",
-      });
-    }
-    if (order.status === "confirmed") {
-      return res.json({
-        success: true,
-        membership: await membershipFor(studentId),
-        message: "This payment is already confirmed",
-      });
-    }
-
-    if (!isTxHash(txHash)) {
-      return res.status(400).json({
-        success: false,
-        message: "Paste the BEP20 transaction hash (starts with 0x)",
-      });
-    }
-
-    const used = await pool.query(
-      "SELECT id FROM superkandle_payments WHERE LOWER(tx_hash) = LOWER($1)",
-      [txHash]
-    );
-    if (used.rows[0] && used.rows[0].id !== order.id) {
-      return res.status(409).json({
-        success: false,
-        message: "This transaction was already used",
-      });
-    }
-
-    const check = await verifyUsdtBep20Transfer({
+    const result = await confirmUsdtCheckout({
+      paymentId,
       txHash,
-      expectedAmount: order.amount,
+      studentId,
     });
-    if (!check.ok) {
-      return res.status(400).json({ success: false, message: check.message });
-    }
-
-    await pool.query(
-      `
-      UPDATE superkandle_payments
-      SET tx_hash = $1, status = 'confirmed', confirmed_at = NOW()
-      WHERE id = $2
-      `,
-      [txHash, order.id]
-    );
-
     res.json({
       success: true,
-      paymentId: order.id,
-      planId: order.plan_id,
-      membership: null,
-      message: "Payment confirmed. Confirm your details to activate SuperKandle.",
+      paymentId: result.paymentId,
+      planId: result.planId,
+      membership: result.membership,
+      message: result.alreadyConfirmed
+        ? result.message
+        : "Payment confirmed. Confirm your details to finish SuperKandle.",
     });
   } catch (error) {
     if (error.code === "23505") {
@@ -656,7 +573,11 @@ router.post("/confirm", requireStudent, async (req, res) => {
       });
     }
     if (error.status) {
-      return httpError(res, error, "Could not confirm payment. Try again in a minute.");
+      return httpError(
+        res,
+        error,
+        "Could not confirm payment. Try again in a minute."
+      );
     }
     console.error("Subscribe confirm error:", error.message);
     res.status(500).json({
