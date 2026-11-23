@@ -990,6 +990,16 @@ body:has(.sk-sub--email) {
   border-color: #88e85e;
 }
 
+.sk-pick.is-trial .sk-pick__bar {
+  background: #1a3320;
+  color: #d7f5c8;
+}
+
+.sk-pick.is-tag .sk-pick__bar {
+  background: #1a3320;
+  color: #d7f5c8;
+}
+
 .sk-pick--soon {
   cursor: default;
 }
@@ -1040,6 +1050,38 @@ body:has(.sk-sub--email) {
   font-size: clamp(13px, 3.2vw, 14px);
   font-style: normal;
   font-weight: 500;
+}
+
+.sk-pick__price {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 0;
+}
+
+.sk-pick__price strong {
+  padding: 0;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.sk-pick__price s {
+  color: #8d8d8d;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: line-through;
+}
+
+.sk-pick__tag {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #1c3a18;
+  color: #88e85e;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .sk-plans-go {

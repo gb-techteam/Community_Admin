@@ -4,6 +4,7 @@ import {
   Check,
   Copy,
   Gift,
+  Clock,
   KeyRound,
   Pencil,
   ShieldCheck,
@@ -70,6 +71,36 @@ function durationLabel(value, unit = "month") {
   if (u === "day") return n === 1 ? "1 day" : `${n} days`;
   if (u === "week") return n === 1 ? "1 week" : `${n} weeks`;
   return n === 1 ? "1 month" : `${n} months`;
+}
+
+function moneyUsd(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "$0.00";
+  return `$${n.toFixed(2)}`;
+}
+
+function durationTitle(value, unit) {
+  return durationLabel(value, unit).replace(/\b\w/g, (char) =>
+    char.toUpperCase()
+  );
+}
+
+function planOfferKind(plan) {
+  if (plan.is_trial) return "trial";
+  const type = String(plan.offer_type || "").toLowerCase();
+  if (type === "tag" || type === "price" || type === "none") return type;
+  const amount = Number(plan.amount);
+  const offer = plan.offer_price == null ? null : Number(plan.offer_price);
+  if (offer != null && offer >= 0 && offer < amount) return "price";
+  if (plan.offer_tag) return "tag";
+  return "none";
+}
+
+function savePercent(amount, offer) {
+  const regular = Number(amount);
+  const sale = Number(offer);
+  if (!regular || !Number.isFinite(sale) || sale >= regular) return null;
+  return Math.round(((regular - sale) / regular) * 100);
 }
 
 function moneyUsdt(value, digits = 2) {
@@ -296,14 +327,15 @@ export default function Subscribe() {
   });
 
   useEffect(() => {
-    if (!plans.length) {
+    const choices = plans;
+    if (!choices.length) {
       setSelectedPlanId(null);
       return;
     }
     setSelectedPlanId((current) => {
-      if (plans.some((plan) => plan.id === current)) return current;
-      const trial = plans.find((plan) => plan.is_trial);
-      return (trial || plans[0]).id;
+      if (choices.some((plan) => plan.id === current)) return current;
+      const trial = choices.find((plan) => plan.is_trial);
+      return (trial || choices[0]).id;
     });
   }, [plans]);
 
@@ -732,23 +764,36 @@ export default function Subscribe() {
                 <div className="sk-picks">
                   {plans.map((plan) => {
                     const selected = plan.id === selectedPlanId;
+                    const kind = planOfferKind(plan);
+                    const percent =
+                      kind === "price"
+                        ? savePercent(plan.amount, plan.offer_price ?? plan.price)
+                        : null;
                     return (
                       <button
                         key={plan.id}
                         type="button"
-                        className={`sk-pick${selected ? " is-selected" : ""}`}
+                        className={`sk-pick${selected ? " is-selected" : ""}${
+                          kind === "trial" ? " is-trial" : ""
+                        }${kind === "tag" ? " is-tag" : ""}`}
                         disabled={busy}
                         aria-pressed={selected}
                         onClick={() => setSelectedPlanId(plan.id)}
                       >
                         <span className="sk-pick__bar">
                           <span>
-                            {plan.is_trial ? (
+                            {kind === "trial" ? (
                               <>
                                 <Gift size={16} /> Free Trial
                               </>
                             ) : (
-                              moneyUsdt(plan.price)
+                              <>
+                                <Clock size={16} />{" "}
+                                {durationTitle(
+                                  plan.duration_value,
+                                  plan.duration_unit
+                                )}
+                              </>
                             )}
                           </span>
                           {selected ? (
@@ -757,15 +802,41 @@ export default function Subscribe() {
                             </span>
                           ) : null}
                         </span>
-                        <strong>{plan.name}</strong>
-                        <em>
-                          {plan.is_trial
-                            ? "Free Plan"
-                            : durationLabel(
+                        {kind === "trial" ? (
+                          <>
+                            <strong>{plan.name}</strong>
+                            <em>Free Plan</em>
+                          </>
+                        ) : (
+                          <>
+                            <span className="sk-pick__price">
+                              <strong>
+                                {moneyUsd(
+                                  kind === "price"
+                                    ? plan.offer_price ?? plan.price
+                                    : plan.amount ?? plan.price
+                                )}
+                              </strong>
+                              {kind === "price" ? (
+                                <s>{moneyUsd(plan.amount)}</s>
+                              ) : null}
+                              {kind === "price" && percent ? (
+                                <span className="sk-pick__tag">
+                                  Save {percent}%
+                                </span>
+                              ) : null}
+                              {kind === "tag" && plan.offer_tag ? (
+                                <span className="sk-pick__tag">{plan.offer_tag}</span>
+                              ) : null}
+                            </span>
+                            <em>
+                              {durationLabel(
                                 plan.duration_value,
                                 plan.duration_unit
                               )}
-                        </em>
+                            </em>
+                          </>
+                        )}
                       </button>
                     );
                   })}
@@ -789,7 +860,8 @@ export default function Subscribe() {
                     const selected = plans.find(
                       (plan) => plan.id === selectedPlanId
                     );
-                    if (selected) choosePlan(selected);
+                    if (!selected) return;
+                    choosePlan(selected);
                   }}
                 >
                   {busy

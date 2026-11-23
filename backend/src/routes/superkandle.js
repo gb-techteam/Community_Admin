@@ -61,8 +61,13 @@ function approxDurationMonths(value, unit) {
 
 function effectivePlanPrice(plan) {
   if (!plan) return DEFAULT_AMOUNT;
-  if (plan.offer_price != null && Number(plan.offer_price) >= 0) {
-    return Number(plan.offer_price);
+  if (plan.is_trial) return 0;
+  const type = String(plan.offer_type || "").toLowerCase();
+  const offer = plan.offer_price == null ? null : Number(plan.offer_price);
+  const pricedOffer =
+    type === "price" || (type === "" && offer != null && offer >= 0);
+  if (pricedOffer && offer != null && Number.isFinite(offer) && offer >= 0) {
+    return offer;
   }
   return Number(plan.amount);
 }
@@ -219,11 +224,23 @@ function normalizePlanPayload(body) {
     body.durationValue ?? body.durationMonths ?? body.duration_months ?? 1
   );
 
+  const offerType = ["none", "tag", "price"].includes(body.offerType)
+    ? body.offerType
+    : "none";
+  const offerTag = String(body.offerTag || "").trim().slice(0, 40);
+
   return {
     name: body.name?.trim() || "",
     amount,
     offerPrice:
-      offerPrice == null || Number.isNaN(offerPrice) ? null : offerPrice,
+      !body.isTrial &&
+      offerType === "price" &&
+      offerPrice != null &&
+      !Number.isNaN(offerPrice)
+        ? offerPrice
+        : null,
+    offerType: body.isTrial ? "none" : offerType,
+    offerTag: !body.isTrial && offerType === "tag" ? offerTag || null : null,
     durationValue,
     durationUnit,
     durationMonths: approxDurationMonths(durationValue, durationUnit),
@@ -238,11 +255,14 @@ function validatePlanPayload(payload) {
   if (!Number.isFinite(payload.amount) || payload.amount < 0) {
     return "Amount must be a valid number";
   }
-  if (
-    payload.offerPrice != null &&
-    (!Number.isFinite(payload.offerPrice) || payload.offerPrice < 0)
-  ) {
-    return "Offer price must be a valid number";
+  if (!payload.isTrial && payload.offerType === "price") {
+    if (payload.offerPrice == null) return "Offer price is required";
+    if (payload.amount > 0 && payload.offerPrice >= payload.amount) {
+      return "Offer price must be lower than the regular amount";
+    }
+  }
+  if (!payload.isTrial && payload.offerType === "tag" && !payload.offerTag) {
+    return "Offer tag is required";
   }
   if (!DURATION_UNITS.has(payload.durationUnit)) {
     return "Duration unit must be day, week, or month";
@@ -401,14 +421,16 @@ router.post("/plans", async (req, res) => {
     const created = await pool.query(
       `
       INSERT INTO superkandle_plans
-        (name, amount, offer_price, duration_value, duration_unit, duration_months, is_active, is_default, is_trial)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (name, amount, offer_price, offer_type, offer_tag, duration_value, duration_unit, duration_months, is_active, is_default, is_trial)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING id
       `,
       [
         payload.name,
         payload.isTrial ? 0 : payload.amount,
-        payload.offerPrice,
+        payload.isTrial ? null : payload.offerPrice,
+        payload.offerType,
+        payload.offerTag,
         payload.durationValue,
         payload.durationUnit,
         payload.durationMonths,
@@ -463,19 +485,23 @@ router.put("/plans/:id", async (req, res) => {
         name = $1,
         amount = $2,
         offer_price = $3,
-        duration_value = $4,
-        duration_unit = $5,
-        duration_months = $6,
-        is_active = $7,
-        is_default = $8,
-        is_trial = $9,
+        offer_type = $4,
+        offer_tag = $5,
+        duration_value = $6,
+        duration_unit = $7,
+        duration_months = $8,
+        is_active = $9,
+        is_default = $10,
+        is_trial = $11,
         updated_at = NOW()
-      WHERE id = $10
+      WHERE id = $12
       `,
       [
         payload.name,
         payload.isTrial ? 0 : payload.amount,
-        payload.offerPrice,
+        payload.isTrial ? null : payload.offerPrice,
+        payload.offerType,
+        payload.offerTag,
         payload.durationValue,
         payload.durationUnit,
         payload.durationMonths,

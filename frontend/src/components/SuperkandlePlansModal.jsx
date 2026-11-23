@@ -18,6 +18,8 @@ const emptyForm = {
   name: "",
   amount: "8",
   offerPrice: "",
+  offerType: "none",
+  offerTag: "",
   durationValue: "1",
   durationUnit: "month",
   isActive: true,
@@ -130,6 +132,8 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
         plan.offer_price == null || plan.offer_price === ""
           ? ""
           : String(plan.offer_price),
+      offerType: plan.is_trial ? "none" : plan.offer_type || "none",
+      offerTag: plan.offer_tag || "",
       durationValue: String(
         plan.duration_value || plan.duration_months || 1
       ),
@@ -158,7 +162,9 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
       const payload = {
         name: form.name,
         amount: Number(form.amount),
-        offerPrice: form.offerPrice === "" ? null : Number(form.offerPrice),
+        offerPrice: form.offerType === "price" ? (form.offerPrice === "" ? null : Number(form.offerPrice)) : null,
+        offerType: form.isTrial ? "none" : form.offerType,
+        offerTag: form.offerType === "tag" ? form.offerTag.trim() : "",
         durationValue: Number(form.durationValue),
         durationUnit: form.durationUnit,
         isActive: form.isActive,
@@ -360,23 +366,64 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
                       setForm({ ...form, amount: e.target.value })
                     }
                     required
+                    disabled={form.isTrial}
                   />
                 </div>
 
                 <div className="field">
-                  <label htmlFor="skPlanOffer">Offer price (optional)</label>
-                  <input
-                    id="skPlanOffer"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.offerPrice}
+                  <label htmlFor="skPlanOfferType">Offer type</label>
+                  <select
+                    id="skPlanOfferType"
+                    value={form.isTrial ? "none" : form.offerType}
+                    disabled={form.isTrial}
                     onChange={(e) =>
-                      setForm({ ...form, offerPrice: e.target.value })
+                      setForm({
+                        ...form,
+                        offerType: e.target.value,
+                        offerPrice: e.target.value === "price" ? form.offerPrice : "",
+                        offerTag: e.target.value === "tag" ? form.offerTag : "",
+                      })
                     }
-                    placeholder="Leave empty if none"
-                  />
+                  >
+                    <option value="none">No offer</option>
+                    <option value="tag">Offer tag only</option>
+                    <option value="price">Offer price</option>
+                  </select>
                 </div>
+
+                {form.offerType === "price" && !form.isTrial ? (
+                  <div className="field">
+                    <label htmlFor="skPlanOffer">Offer price (USD)</label>
+                    <input
+                      id="skPlanOffer"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.offerPrice}
+                      onChange={(e) =>
+                        setForm({ ...form, offerPrice: e.target.value })
+                      }
+                      placeholder="Lower than the regular amount"
+                      required
+                    />
+                  </div>
+                ) : null}
+
+                {form.offerType === "tag" && !form.isTrial ? (
+                  <div className="field">
+                    <label htmlFor="skPlanTag">Offer tag</label>
+                    <input
+                      id="skPlanTag"
+                      value={form.offerTag}
+                      maxLength={24}
+                      onChange={(e) =>
+                        setForm({ ...form, offerTag: e.target.value })
+                      }
+                      placeholder="Popular"
+                      required
+                    />
+                  </div>
+                ) : null}
 
                 <div className="field sk-plans-span">
                   <label>Duration unit</label>
@@ -490,6 +537,7 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
                       setForm({
                         ...form,
                         isTrial,
+                        offerType: isTrial ? "none" : form.offerType,
                         amount: isTrial ? "0" : form.amount === "0" ? "8" : form.amount,
                       });
                     }}
@@ -571,8 +619,8 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
             ) : (
               <ul className="sk-plans-grid">
                 {plans.map((plan) => {
-                  const hasOffer =
-                    plan.offer_price != null && plan.offer_price !== "";
+                  const offerType = plan.is_trial ? "trial" : plan.offer_type || "none";
+                  const hasOffer = offerType === "price" && plan.offer_price != null && plan.offer_price !== "";
                   const value =
                     plan.duration_value || plan.duration_months || 1;
                   const unit = plan.duration_unit || "month";
@@ -621,6 +669,9 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
                           ) : (
                             <em>{money(plan.amount)}</em>
                           )}
+                          {offerType === "tag" && plan.offer_tag ? (
+                            <em>{plan.offer_tag}</em>
+                          ) : null}
                         </span>
 
                         <span className="sk-plan-tile__meta">

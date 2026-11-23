@@ -398,6 +398,8 @@ router.get("/plans", requireStudent, async (req, res) => {
         p.name,
         p.amount,
         p.offer_price,
+        p.offer_type,
+        p.offer_tag,
         p.is_trial,
         p.is_default,
         COALESCE(p.duration_value, p.duration_months, 1) AS duration_value,

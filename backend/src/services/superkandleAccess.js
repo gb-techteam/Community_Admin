@@ -6,8 +6,12 @@ export const DEFAULT_AMOUNT = 8;
 export function effectivePlanPrice(plan) {
   if (!plan) return DEFAULT_AMOUNT;
   if (plan.is_trial) return 0;
-  if (plan.offer_price != null && Number(plan.offer_price) >= 0) {
-    return Number(plan.offer_price);
+  const type = String(plan.offer_type || "").toLowerCase();
+  const offer = plan.offer_price == null ? null : Number(plan.offer_price);
+  const pricedOffer =
+    type === "price" || (type === "" && offer != null && offer >= 0);
+  if (pricedOffer && offer != null && Number.isFinite(offer) && offer >= 0) {
+    return offer;
   }
   return Number(plan.amount);
 }

@@ -419,7 +419,18 @@ export async function ensureSuperkandleSchema() {
   `);
   await pool.query(`
     ALTER TABLE superkandle_plans
-    ALTER COLUMN duration_unit SET DEFAULT 'month'
+    ADD COLUMN IF NOT EXISTS offer_type VARCHAR(10) NOT NULL DEFAULT 'none'
+  `);
+  await pool.query(`
+    ALTER TABLE superkandle_plans
+    ADD COLUMN IF NOT EXISTS offer_tag VARCHAR(40)
+  `);
+  await pool.query(`
+    UPDATE superkandle_plans
+    SET offer_type = 'price'
+    WHERE is_trial = FALSE
+      AND offer_price IS NOT NULL
+      AND offer_type = 'none'
   `);
 
   await pool.query(`
