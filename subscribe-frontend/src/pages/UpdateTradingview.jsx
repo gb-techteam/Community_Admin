@@ -84,13 +84,13 @@ export default function UpdateTradingview() {
   }
 
   return (
-    <div className="sk-sub">
+    <div className="sk-sub sk-sub--email">
       <header className="sk-sub__brand">
         <div className="sk-mark" aria-hidden="true">
           <span>Super</span>
           <span>Kandle</span>
         </div>
-        <div>
+        <div className="sk-sub__brand-copy">
           <p>Superkandle</p>
           <strong>Update TradingView ID</strong>
         </div>

@@ -604,7 +604,9 @@ export default function Subscribe() {
       <main className="sk-sub__card">
         {step === "email" ? (
           <>
-            <h1>Continue with your academy email</h1>
+            <h1>
+              Continue with <br className="sk-desk-only" />your academy email
+            </h1>
             <p className="sk-sub__lead">
               Only enrolled students can take a SuperKandle plan.
               <br />
@@ -884,48 +886,37 @@ export default function Subscribe() {
 
         {step === "confirm" ? (
           <>
-            <p className="sk-hello">{studentHello(student)}</p>
             <h1>Confirm your details</h1>
             <p className="sk-sub__lead">
-              The SuperKandle invite is shared to this TradingView ID. It must
-              match the username you use to log in to TradingView.
+              The invite goes to this TradingView username.
             </p>
             <form className="sk-sub__form" onSubmit={confirmDetails}>
-              <div className="sk-sub__tv-priority">
-                <div className="sk-sub__tv-priority-head">
-                  <KeyRound size={16} aria-hidden="true" />
-                  <label htmlFor="confirmTv">TradingView ID</label>
-                </div>
-                <div className="sk-sub__tv-priority-row">
-                  <input
-                    id="confirmTv"
-                    value={tvDraft}
-                    onChange={(e) => setTvDraft(e.target.value)}
-                    placeholder="Exact TradingView username"
-                    autoComplete="off"
-                    spellCheck="false"
-                    readOnly={tvLocked}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="sk-sub__tv-edit"
-                    onClick={() => {
-                      setTvLocked(false);
-                      requestAnimationFrame(() => {
-                        document.getElementById("confirmTv")?.focus();
-                      });
-                    }}
-                    aria-label="Edit TradingView ID"
-                    title="Edit TradingView ID"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                </div>
-                <p className="sk-sub__tv-priority-hint">
-                  Double-check this ID. If it is wrong, the invite will go to
-                  the wrong TradingView account and you will not see SuperKandle.
-                </p>
+              <label htmlFor="confirmTv">TradingView ID</label>
+              <div className="sk-sub__tv-priority-row">
+                <input
+                  id="confirmTv"
+                  value={tvDraft}
+                  onChange={(e) => setTvDraft(e.target.value)}
+                  placeholder="Exact TradingView username"
+                  autoComplete="off"
+                  spellCheck="false"
+                  readOnly={tvLocked}
+                  required
+                />
+                <button
+                  type="button"
+                  className="sk-sub__tv-edit"
+                  onClick={() => {
+                    setTvLocked(false);
+                    requestAnimationFrame(() => {
+                      document.getElementById("confirmTv")?.focus();
+                    });
+                  }}
+                  aria-label="Edit TradingView ID"
+                  title="Edit TradingView ID"
+                >
+                  <Pencil size={16} />
+                </button>
               </div>
               {batchLocked && batchId ? (
                 <div className="sk-sub__lock-field">
