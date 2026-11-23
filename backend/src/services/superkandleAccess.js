@@ -1,5 +1,6 @@
 import pool from "../config/db.js";
 import { broadcastSuperkandleAccess } from "../realtime/channels.js";
+import { applyTradingviewUsername } from "./tradingviewQueue.js";
 
 export const DEFAULT_AMOUNT = 8;
 
@@ -313,14 +314,7 @@ export async function saveTradingviewUsername(studentId, username) {
     error.status = 400;
     throw error;
   }
-  await pool.query(
-    `
-    UPDATE students
-    SET tradingview_username = $1, updated_at = NOW()
-    WHERE id = $2
-    `,
-    [value, studentId]
-  );
+  await applyTradingviewUsername(studentId, value);
   await clearMemberAccessError(studentId);
   return loadPublicStudent(studentId);
 }

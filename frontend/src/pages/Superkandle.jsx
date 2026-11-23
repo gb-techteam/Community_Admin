@@ -23,6 +23,7 @@ import { connectSuperkandleSocket } from "../lib/superkandleSocket";
 import { useFeedback } from "../lib/feedback";
 import { EntityCell, MetricCell } from "../components/TableCells";
 import SuperkandleMemberModal from "../components/SuperkandleMemberModal";
+import SuperkandlePaymentsModal from "../components/SuperkandlePaymentsModal";
 import SuperkandlePlansModal from "../components/SuperkandlePlansModal";
 
 function fullName(first, last) {
@@ -100,6 +101,7 @@ export default function Superkandle() {
   const [sharedFilter, setSharedFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
+  const [showPayments, setShowPayments] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -494,6 +496,14 @@ export default function Superkandle() {
           <button
             type="button"
             className="btn-plans"
+            onClick={() => setShowPayments(true)}
+          >
+            <CircleDollarSign size={16} strokeWidth={2} aria-hidden="true" />
+            Payments
+          </button>
+          <button
+            type="button"
+            className="btn-plans"
             onClick={() => setShowPlans(true)}
           >
             <BadgeDollarSign size={16} strokeWidth={2} aria-hidden="true" />
@@ -711,6 +721,13 @@ export default function Superkandle() {
       {showPlans ? (
         <SuperkandlePlansModal
           onClose={() => setShowPlans(false)}
+          onChanged={loadMembers}
+        />
+      ) : null}
+
+      {showPayments ? (
+        <SuperkandlePaymentsModal
+          onClose={() => setShowPayments(false)}
           onChanged={loadMembers}
         />
       ) : null}

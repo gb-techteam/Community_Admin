@@ -484,6 +484,7 @@ export default function Subscribe() {
       };
       setPendingCheckout(pending);
       sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+      if (data.membership) setMembership(data.membership);
       goToConfirm(student);
     } catch (err) {
       setError(err.message);

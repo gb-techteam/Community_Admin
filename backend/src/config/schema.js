@@ -531,6 +531,12 @@ export async function ensureSuperkandleSchema() {
   `);
 
   await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_superkandle_payments_tx_hash_lower
+    ON superkandle_payments (LOWER(tx_hash))
+    WHERE tx_hash IS NOT NULL
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS superkandle_access_requests (
       id SERIAL PRIMARY KEY,
       email VARCHAR(255) NOT NULL,
@@ -641,6 +647,32 @@ export async function ensureSuperkandleSchema() {
     WHERE t.name = 'Portal staff'
       AND t.is_signal_only = FALSE
     ON CONFLICT DO NOTHING
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tradingview_removals (
+      id SERIAL PRIMARY KEY,
+      student_id INTEGER REFERENCES students(id) ON DELETE SET NULL,
+      username VARCHAR(120) NOT NULL,
+      username_key VARCHAR(120) NOT NULL,
+      replaced_with VARCHAR(120),
+      reason VARCHAR(40) NOT NULL DEFAULT 'updated',
+      access_was_shared BOOLEAN NOT NULL DEFAULT FALSE,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      processed_at TIMESTAMPTZ
+    )
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_tv_removals_pending_key
+    ON tradingview_removals (username_key)
+    WHERE status = 'pending'
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_tv_removals_status
+    ON tradingview_removals (status, created_at DESC)
   `);
 }
 
