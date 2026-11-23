@@ -22,6 +22,7 @@ import { broadcastSuperkandleAccess } from "../realtime/channels.js";
 import {
   applyTradingviewUsername,
   queueTradingviewRemoval,
+  resetMemberInvite,
   VALID_SK_PLAN_SQL,
 } from "../services/tradingviewQueue.js";
 
@@ -969,7 +970,14 @@ router.patch("/:id/extend", async (req, res) => {
       updated = await pool.query(
         `
         UPDATE superkandle_members
-        SET expires_at = $1::date, is_active = TRUE, updated_at = NOW()
+        SET
+          expires_at = $1::date,
+          is_active = TRUE,
+          access_shared = FALSE,
+          access_shared_at = NULL,
+          access_error = FALSE,
+          access_error_message = '',
+          updated_at = NOW()
         WHERE id = $2
         RETURNING expires_at
         `,
@@ -991,6 +999,10 @@ router.patch("/:id/extend", async (req, res) => {
             GREATEST(COALESCE(expires_at, CURRENT_DATE), CURRENT_DATE)
             + $1::interval,
           is_active = TRUE,
+          access_shared = FALSE,
+          access_shared_at = NULL,
+          access_error = FALSE,
+          access_error_message = '',
           updated_at = NOW()
         WHERE id = $2
         RETURNING expires_at
@@ -1506,6 +1518,12 @@ router.put("/:id", async (req, res) => {
 
     if (plan.is_trial) {
       await markTrialClaimed(existing.student_id);
+    }
+
+    const prevExpiry = String(existing.expires_at || "").slice(0, 10);
+    const nextExpiry = String(expiresAt || "").slice(0, 10);
+    if (prevExpiry !== nextExpiry) {
+      await resetMemberInvite(existing.student_id);
     }
 
     const member = await getMember(req.params.id);

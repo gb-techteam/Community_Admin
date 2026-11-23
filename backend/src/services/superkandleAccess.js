@@ -122,6 +122,26 @@ export async function activateMembership({
       payment_note = EXCLUDED.payment_note,
       expires_at = EXCLUDED.expires_at,
       is_active = TRUE,
+      access_shared = CASE
+        WHEN superkandle_members.expires_at IS DISTINCT FROM EXCLUDED.expires_at
+        THEN FALSE
+        ELSE superkandle_members.access_shared
+      END,
+      access_shared_at = CASE
+        WHEN superkandle_members.expires_at IS DISTINCT FROM EXCLUDED.expires_at
+        THEN NULL
+        ELSE superkandle_members.access_shared_at
+      END,
+      access_error = CASE
+        WHEN superkandle_members.expires_at IS DISTINCT FROM EXCLUDED.expires_at
+        THEN FALSE
+        ELSE superkandle_members.access_error
+      END,
+      access_error_message = CASE
+        WHEN superkandle_members.expires_at IS DISTINCT FROM EXCLUDED.expires_at
+        THEN ''
+        ELSE superkandle_members.access_error_message
+      END,
       updated_at = NOW()
     RETURNING id, expires_at
     `,
