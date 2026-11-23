@@ -660,9 +660,22 @@ export default function Subscribe() {
                       <span className="sk-sub__badge">
                         <Gift size={12} /> Free trial
                       </span>
+                    ) : plan.showOfferTag ? (
+                      <span className="sk-sub__badge sk-sub__badge--offer">
+                        Offer
+                      </span>
                     ) : null}
                     <strong>{plan.name}</strong>
-                    <em>{moneyUsdt(plan.price)}</em>
+                    {plan.hasOfferPrice ? (
+                      <em>
+                        <span className="sk-sub__strike">
+                          {moneyUsdt(plan.amount)}
+                        </span>{" "}
+                        {moneyUsdt(plan.price)}
+                      </em>
+                    ) : (
+                      <em>{moneyUsdt(plan.price)}</em>
+                    )}
                     <span>
                       {durationLabel(plan.duration_value, plan.duration_unit)}
                     </span>

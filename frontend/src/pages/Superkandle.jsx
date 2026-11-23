@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BadgeDollarSign,
   Ban,
+  CalendarPlus,
   Check,
   CircleDollarSign,
   Clock3,
@@ -25,6 +26,7 @@ import { EntityCell, MetricCell } from "../components/TableCells";
 import SuperkandleMemberModal from "../components/SuperkandleMemberModal";
 import SuperkandlePaymentsModal from "../components/SuperkandlePaymentsModal";
 import SuperkandlePlansModal from "../components/SuperkandlePlansModal";
+import SuperkandleExtendModal from "../components/SuperkandleExtendModal";
 
 function fullName(first, last) {
   return [first, last].filter(Boolean).join(" ").trim() || "—";
@@ -112,6 +114,8 @@ export default function Superkandle() {
   const [tvDraft, setTvDraft] = useState("");
   const [savingTv, setSavingTv] = useState(false);
   const [viewingMember, setViewingMember] = useState(null);
+  const [extendingMember, setExtendingMember] = useState(null);
+  const [savingExtend, setSavingExtend] = useState(false);
 
   async function loadMembers(
     query = search,
@@ -294,6 +298,30 @@ export default function Superkandle() {
       });
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function handleExtend({ member, preset, expiresAt }) {
+    setSavingExtend(true);
+    setError("");
+    try {
+      const data = await api(`/api/superkandle/${member.id}/extend`, {
+        method: "PATCH",
+        body: JSON.stringify({ preset, expiresAt }),
+      });
+      setExtendingMember(null);
+      await loadMembers();
+      if (viewingMember?.id === member.id && data.member) {
+        setViewingMember(data.member);
+      }
+      notify({
+        title: "Expiry extended",
+        message: data.message || "Membership expiry was updated.",
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingExtend(false);
     }
   }
 
@@ -700,6 +728,14 @@ export default function Superkandle() {
           <div className="entity-form__actions">
             <button
               type="button"
+              className="btn-primary"
+              onClick={() => setExtendingMember(viewingMember)}
+            >
+              <CalendarPlus size={16} strokeWidth={2} aria-hidden="true" />
+              Extend expiry
+            </button>
+            <button
+              type="button"
               className="btn-secondary"
               onClick={() => handleResetTrial(viewingMember)}
             >
@@ -729,6 +765,20 @@ export default function Superkandle() {
         <SuperkandlePaymentsModal
           onClose={() => setShowPayments(false)}
           onChanged={loadMembers}
+        />
+      ) : null}
+
+      {extendingMember ? (
+        <SuperkandleExtendModal
+          member={extendingMember}
+          name={fullName(
+            extendingMember.first_name,
+            extendingMember.last_name
+          )}
+          currentExpiry={formatDate(extendingMember.expires_at)}
+          saving={savingExtend}
+          onClose={() => setExtendingMember(null)}
+          onSave={handleExtend}
         />
       ) : null}
 
@@ -1044,6 +1094,14 @@ export default function Superkandle() {
                     </td>
                     <td className="sk-col-actions">
                       <div className="row-actions">
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={() => setExtendingMember(member)}
+                        >
+                          <CalendarPlus size={14} strokeWidth={2} aria-hidden="true" />
+                          Extend
+                        </button>
                         <button
                           type="button"
                           className="btn-ghost"

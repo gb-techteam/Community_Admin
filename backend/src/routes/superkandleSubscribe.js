@@ -399,6 +399,7 @@ router.get("/plans", requireStudent, async (req, res) => {
         p.name,
         p.amount,
         p.offer_price,
+        p.show_offer_tag,
         p.is_trial,
         p.is_default,
         COALESCE(p.duration_value, p.duration_months, 1) AS duration_value,
@@ -430,6 +431,12 @@ router.get("/plans", requireStudent, async (req, res) => {
     const plans = result.rows.map((plan) => ({
       ...plan,
       price: effectivePlanPrice(plan),
+      showOfferTag: Boolean(
+        plan.show_offer_tag ||
+          (plan.offer_price != null && Number(plan.offer_price) >= 0)
+      ),
+      hasOfferPrice:
+        plan.offer_price != null && Number(plan.offer_price) >= 0,
     }));
 
     res.json({

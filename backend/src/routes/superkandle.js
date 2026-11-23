@@ -14,8 +14,9 @@ import { loadSettings, saveSettings } from "../services/portalSettings.js";
 import {
   notifyInvitationFailed,
   notifyInvitationShared,
-  notifyMembershipActivated,
   notifyMembershipActivatedOnce,
+  previewPlansUpdatedMail,
+  sendPlansUpdatedBroadcast,
 } from "../services/superkandleMails.js";
 import { broadcastSuperkandleAccess } from "../realtime/channels.js";
 import {
@@ -237,6 +238,9 @@ function normalizePlanPayload(body) {
     isActive: body.isActive !== false && body.isActive !== "false",
     isDefault: Boolean(body.isDefault),
     isTrial: Boolean(body.isTrial),
+    showOfferTag:
+      Boolean(body.showOfferTag) ||
+      (offerPrice != null && !Number.isNaN(offerPrice)),
   };
 }
 
@@ -339,6 +343,32 @@ router.patch("/checkout-settings", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to save SuperKandle settings",
+    });
+  }
+});
+
+router.get("/plans-broadcast/preview", async (_req, res) => {
+  try {
+    const preview = await previewPlansUpdatedMail();
+    res.json({ success: true, ...preview });
+  } catch (error) {
+    console.error("Plans broadcast preview error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Could not build the email preview",
+    });
+  }
+});
+
+router.post("/plans-broadcast/send", async (_req, res) => {
+  try {
+    const result = await sendPlansUpdatedBroadcast();
+    res.json({ success: true, ...result });
+  } catch (error) {
+    const status = Number(error.status) || 500;
+    res.status(status).json({
+      success: false,
+      message: error.message || "Could not send the plans email",
     });
   }
 });
@@ -590,8 +620,8 @@ router.post("/plans", async (req, res) => {
     const created = await pool.query(
       `
       INSERT INTO superkandle_plans
-        (name, amount, offer_price, duration_value, duration_unit, duration_months, is_active, is_default, is_trial)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (name, amount, offer_price, duration_value, duration_unit, duration_months, is_active, is_default, is_trial, show_offer_tag)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING id
       `,
       [
@@ -604,6 +634,7 @@ router.post("/plans", async (req, res) => {
         payload.isActive,
         payload.isDefault,
         payload.isTrial,
+        payload.showOfferTag,
       ]
     );
 
@@ -658,8 +689,9 @@ router.put("/plans/:id", async (req, res) => {
         is_active = $7,
         is_default = $8,
         is_trial = $9,
+        show_offer_tag = $10,
         updated_at = NOW()
-      WHERE id = $10
+      WHERE id = $11
       `,
       [
         payload.name,
@@ -671,6 +703,7 @@ router.put("/plans/:id", async (req, res) => {
         payload.isActive,
         payload.isDefault,
         payload.isTrial,
+        payload.showOfferTag,
         req.params.id,
       ]
     );
@@ -887,6 +920,106 @@ router.get("/registered", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to load registered SuperKandle students",
+    });
+  }
+});
+
+const EXTEND_PRESETS = {
+  week: { interval: "7 days", label: "1 week" },
+  month: { interval: "1 month", label: "1 month" },
+  months3: { interval: "3 months", label: "3 months" },
+  months6: { interval: "6 months", label: "6 months" },
+};
+
+function todayIsoDate() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+router.patch("/:id/extend", async (req, res) => {
+  try {
+    const existing = await getMember(req.params.id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "Superkandle member not found",
+      });
+    }
+
+    const preset = String(req.body?.preset || "").trim().toLowerCase();
+    let updated;
+
+    if (preset === "custom") {
+      const expiresAt = String(req.body?.expiresAt || "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresAt)) {
+        return res.status(400).json({
+          success: false,
+          message: "Choose a valid expiry date",
+        });
+      }
+      if (expiresAt < todayIsoDate()) {
+        return res.status(400).json({
+          success: false,
+          message: "Custom expiry must be today or later",
+        });
+      }
+      updated = await pool.query(
+        `
+        UPDATE superkandle_members
+        SET expires_at = $1::date, is_active = TRUE, updated_at = NOW()
+        WHERE id = $2
+        RETURNING expires_at
+        `,
+        [expiresAt, req.params.id]
+      );
+    } else {
+      const spec = EXTEND_PRESETS[preset];
+      if (!spec) {
+        return res.status(400).json({
+          success: false,
+          message: "Choose 1 week, 1 month, 3 months, 6 months, or a custom date",
+        });
+      }
+      updated = await pool.query(
+        `
+        UPDATE superkandle_members
+        SET
+          expires_at =
+            GREATEST(COALESCE(expires_at, CURRENT_DATE), CURRENT_DATE)
+            + $1::interval,
+          is_active = TRUE,
+          updated_at = NOW()
+        WHERE id = $2
+        RETURNING expires_at
+        `,
+        [spec.interval, req.params.id]
+      );
+    }
+
+    const expiresAt = updated.rows[0]?.expires_at;
+    if (!expiresAt) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to extend expiry",
+      });
+    }
+
+    const member = await getMember(req.params.id);
+    const label = EXTEND_PRESETS[preset]?.label || "custom date";
+    res.json({
+      success: true,
+      member,
+      expiresAt,
+      message: `Expiry extended (${label})`,
+    });
+  } catch (error) {
+    console.error("Extend SuperKandle expiry error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to extend expiry",
     });
   }
 });
@@ -1281,16 +1414,7 @@ router.post("/", async (req, res) => {
 
     const member = await getMember(created.rows[0].id);
     if (payload.paymentStatus === "paid") {
-      await notifyMembershipActivated({
-        studentId: payload.studentId,
-        planName: plan.name,
-        expiresAt: member?.expires_at,
-        kind: plan.is_trial ? "trial" : "paid",
-        amount,
-        durationValue: plan.duration_value || plan.duration_months,
-        durationUnit: plan.duration_unit,
-        paymentMethod: payload.paymentMethod,
-      });
+      await notifyMembershipActivatedOnce(payload.studentId);
     }
     res.status(201).json({ success: true, member });
   } catch (error) {
@@ -1386,16 +1510,7 @@ router.put("/:id", async (req, res) => {
 
     const member = await getMember(req.params.id);
     if (payload.paymentStatus === "paid") {
-      await notifyMembershipActivated({
-        studentId: existing.student_id,
-        planName: plan.name,
-        expiresAt: member?.expires_at,
-        kind: plan.is_trial ? "trial" : "paid",
-        amount,
-        durationValue: plan.duration_value || plan.duration_months,
-        durationUnit: plan.duration_unit,
-        paymentMethod: payload.paymentMethod,
-      });
+      await notifyMembershipActivatedOnce(existing.student_id);
     }
     res.json({ success: true, member });
   } catch (error) {

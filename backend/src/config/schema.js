@@ -401,6 +401,10 @@ export async function ensureSuperkandleSchema() {
     ALTER TABLE superkandle_plans
     ADD COLUMN IF NOT EXISTS is_trial BOOLEAN NOT NULL DEFAULT FALSE
   `);
+  await pool.query(`
+    ALTER TABLE superkandle_plans
+    ADD COLUMN IF NOT EXISTS show_offer_tag BOOLEAN NOT NULL DEFAULT FALSE
+  `);
 
   // Migrate legacy duration_months → duration_value / duration_unit
   await pool.query(`
