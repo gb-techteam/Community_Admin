@@ -89,7 +89,7 @@ export const VALID_SK_PLAN_SQL = `
   AND (m.expires_at IS NULL OR m.expires_at >= CURRENT_DATE)
 `;
 
-async function resetMemberInvite(studentId) {
+export async function resetMemberInvite(studentId) {
   await pool.query(
     `
     UPDATE superkandle_members
