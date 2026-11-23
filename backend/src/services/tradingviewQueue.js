@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { notifyTradingviewIdUpdated } from "./superkandleMails.js";
 
 export function normalizeTvHandle(value) {
   return String(value || "")
@@ -85,8 +86,7 @@ export async function cancelTradingviewRemoval(username) {
 export const VALID_SK_PLAN_SQL = `
   m.is_active = TRUE
   AND LOWER(COALESCE(m.payment_status, '')) = 'paid'
-  AND m.expires_at IS NOT NULL
-  AND m.expires_at >= CURRENT_DATE
+  AND (m.expires_at IS NULL OR m.expires_at >= CURRENT_DATE)
 `;
 
 async function resetMemberInvite(studentId) {
@@ -151,6 +151,14 @@ export async function applyTradingviewUsername(studentId, nextUsername) {
     `,
     [next || null, studentId]
   );
+
+  if (changed) {
+    await notifyTradingviewIdUpdated({
+      studentId,
+      previousUsername: previous,
+      nextUsername: next,
+    });
+  }
 
   return { changed, previous: previous || null, next: next || null };
 }

@@ -17,6 +17,7 @@ import { useFeedback } from "../lib/feedback";
 const emptyForm = {
   name: "",
   amount: "8",
+  offerKind: "none",
   offerPrice: "",
   durationValue: "1",
   durationUnit: "month",
@@ -24,6 +25,19 @@ const emptyForm = {
   isDefault: false,
   isTrial: false,
 };
+
+function offerKindFromPlan(plan) {
+  if (plan.offer_price != null && plan.offer_price !== "") return "price";
+  if (plan.show_offer_tag) return "tag";
+  return "none";
+}
+
+function hasOfferTag(plan) {
+  return (
+    Boolean(plan.show_offer_tag) ||
+    (plan.offer_price != null && plan.offer_price !== "")
+  );
+}
 
 const FALLBACK_SUGGESTIONS = {
   day: [1, 3, 7, 14, 30],
@@ -66,6 +80,8 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
   const [error, setError] = useState("");
   const [displayPricedPlans, setDisplayPricedPlans] = useState(true);
   const [resettingTrials, setResettingTrials] = useState(false);
+  const [mailPreview, setMailPreview] = useState(null);
+  const [sendingMail, setSendingMail] = useState(false);
 
   const suggestionValues = useMemo(
     () =>
@@ -126,6 +142,7 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
     setForm({
       name: plan.name || "",
       amount: String(plan.amount ?? ""),
+      offerKind: offerKindFromPlan(plan),
       offerPrice:
         plan.offer_price == null || plan.offer_price === ""
           ? ""
@@ -155,10 +172,19 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
     setError("");
 
     try {
+      if (form.offerKind === "price" && form.offerPrice === "") {
+        setError("Enter an offer price, or choose Offer tag only.");
+        setSaving(false);
+        return;
+      }
       const payload = {
         name: form.name,
         amount: Number(form.amount),
-        offerPrice: form.offerPrice === "" ? null : Number(form.offerPrice),
+        offerPrice:
+          form.offerKind === "price" && form.offerPrice !== ""
+            ? Number(form.offerPrice)
+            : null,
+        showOfferTag: form.offerKind === "tag" || form.offerKind === "price",
         durationValue: Number(form.durationValue),
         durationUnit: form.durationUnit,
         isActive: form.isActive,
@@ -227,6 +253,16 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
   }
 
   async function togglePricedPlans(next) {
+    const ok = await confirm({
+      title: next ? "Show priced SuperKandle plans?" : "Hide priced SuperKandle plans?",
+      message: next
+        ? "Students will see paid plans on checkout. Confirm you want to turn this on."
+        : "Students will only see a free plan, if one is active. Confirm you want to hide paid plans.",
+      confirmLabel: next ? "Show priced plans" : "Hide priced plans",
+      tone: next ? "info" : "danger",
+    });
+    if (!ok) return;
+
     const previous = displayPricedPlans;
     setDisplayPricedPlans(next);
     setError("");
@@ -244,6 +280,52 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
     } catch (err) {
       setDisplayPricedPlans(previous);
       setError(err.message);
+      return;
+    }
+
+    if (!next) return;
+
+    const sendMail = await confirm({
+      title: "Email everyone?",
+      message:
+        "Send an email to every student that SuperKandle plans are updated and they can check out?",
+      confirmLabel: "Preview email",
+      cancelLabel: "Don't send",
+      tone: "info",
+    });
+    if (!sendMail) return;
+
+    try {
+      const data = await api("/api/superkandle/plans-broadcast/preview");
+      setMailPreview({ ...data, displayPricedPlans: true });
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function sendPlansMail() {
+    if (!mailPreview) return;
+    setSendingMail(true);
+    setError("");
+    try {
+      const data = await api("/api/superkandle/plans-broadcast/send", {
+        method: "POST",
+        body: JSON.stringify({
+          displayPricedPlans: mailPreview.displayPricedPlans,
+        }),
+      });
+      setMailPreview(null);
+      notify({
+        title: data.stopped ? "Sending stopped" : "Emails sent",
+        message:
+          data.message ||
+          `Sent ${data.sent || 0} checkout emails.`,
+        tone: data.stopped ? "info" : "success",
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSendingMail(false);
     }
   }
 
@@ -272,6 +354,7 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
   }
 
   const modal = (
+    <>
     <div
       className="sk-plans-backdrop"
       onClick={(event) => {
@@ -363,20 +446,56 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
                   />
                 </div>
 
-                <div className="field">
-                  <label htmlFor="skPlanOffer">Offer price (optional)</label>
-                  <input
-                    id="skPlanOffer"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.offerPrice}
-                    onChange={(e) =>
-                      setForm({ ...form, offerPrice: e.target.value })
-                    }
-                    placeholder="Leave empty if none"
-                  />
+                <div className="field sk-plans-span">
+                  <label>Offer type</label>
+                  <div className="sk-duration-chips">
+                    {[
+                      { value: "none", label: "No offer" },
+                      { value: "tag", label: "Offer tag only" },
+                      { value: "price", label: "Offer price" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`sk-duration-chip ${
+                          form.offerKind === option.value ? "is-on" : ""
+                        }`}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            offerKind: option.value,
+                            offerPrice:
+                              option.value === "price" ? form.offerPrice : "",
+                          })
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {form.offerKind === "price" ? (
+                  <div className="field sk-plans-span">
+                    <label htmlFor="skPlanOffer">Offer price (USD)</label>
+                    <input
+                      id="skPlanOffer"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.offerPrice}
+                      onChange={(e) =>
+                        setForm({ ...form, offerPrice: e.target.value })
+                      }
+                      placeholder="Checkout amount for this offer"
+                      required
+                    />
+                  </div>
+                ) : form.offerKind === "tag" ? (
+                  <p className="sk-plan-hint">
+                    Students see an Offer tag. They still pay the regular amount.
+                  </p>
+                ) : null}
 
                 <div className="field sk-plans-span">
                   <label>Duration unit</label>
@@ -571,8 +690,9 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
             ) : (
               <ul className="sk-plans-grid">
                 {plans.map((plan) => {
-                  const hasOffer =
+                  const hasOfferPrice =
                     plan.offer_price != null && plan.offer_price !== "";
+                  const tagged = hasOfferTag(plan);
                   const value =
                     plan.duration_value || plan.duration_months || 1;
                   const unit = plan.duration_unit || "month";
@@ -597,6 +717,10 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
                               <span className="sk-plan-tile__badge is-trial">
                                 Trial
                               </span>
+                            ) : tagged ? (
+                              <span className="sk-plan-tile__badge is-offer">
+                                Offer
+                              </span>
                             ) : null}
                             {plan.is_default ? (
                               <span className="sk-plan-tile__badge">
@@ -611,7 +735,7 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
                         <span className="sk-plan-tile__price">
                           {plan.is_trial ? (
                             <em>{money(0, { trial: true })}</em>
-                          ) : hasOffer ? (
+                          ) : hasOfferPrice ? (
                             <>
                               <span className="sk-plans-card__strike">
                                 {money(plan.amount)}
@@ -680,6 +804,73 @@ export default function SuperkandlePlansModal({ onClose, onChanged }) {
         )}
       </div>
     </div>
+    {mailPreview ? (
+      <div
+        className="sk-mail-preview-backdrop"
+        onClick={(event) => {
+          if (event.target === event.currentTarget && !sendingMail) {
+            setMailPreview(null);
+          }
+        }}
+      >
+        <div
+          className="sk-mail-preview"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sk-mail-preview-title"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <header>
+            <div>
+              <p className="sk-pay-kicker">Email preview</p>
+              <h2 id="sk-mail-preview-title">{mailPreview.subject}</h2>
+              <p className="sk-pay-sub">
+                {mailPreview.recipientCount} student
+                {mailPreview.recipientCount === 1 ? "" : "s"} will receive this.
+                {mailPreview.smtpReady === false
+                  ? " SMTP is not configured yet."
+                  : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="sk-pay-close"
+              onClick={() => !sendingMail && setMailPreview(null)}
+              aria-label="Close preview"
+            >
+              <X size={18} strokeWidth={2.2} />
+            </button>
+          </header>
+          <iframe
+            title="SuperKandle plans email preview"
+            className="sk-mail-preview__frame"
+            srcDoc={mailPreview.html || ""}
+          />
+          <pre className="sk-mail-preview__text">{mailPreview.text}</pre>
+          <footer>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={sendingMail}
+              onClick={() => setMailPreview(null)}
+            >
+              Don't send
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={sendingMail || mailPreview.smtpReady === false}
+              onClick={sendPlansMail}
+            >
+              {sendingMail
+                ? "Sending…"
+                : `Send to ${mailPreview.recipientCount} students`}
+            </button>
+          </footer>
+        </div>
+      </div>
+    ) : null}
+  </>
   );
 
   return createPortal(modal, document.body);

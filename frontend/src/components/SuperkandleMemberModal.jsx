@@ -442,8 +442,10 @@ export default function SuperkandleMemberModal({
                 <ul className="sk-plan-row">
                   {plans.map((plan) => {
                     const selected = String(form.planId) === String(plan.id);
-                    const hasOffer =
+                    const hasOfferPrice =
                       plan.offer_price != null && plan.offer_price !== "";
+                    const tagged =
+                      Boolean(plan.show_offer_tag) || hasOfferPrice;
                     return (
                       <li key={plan.id}>
                         <button
@@ -461,6 +463,10 @@ export default function SuperkandleMemberModal({
                               {plan.is_trial ? (
                                 <span className="sk-plan-tile__badge is-trial">
                                   Trial
+                                </span>
+                              ) : tagged ? (
+                                <span className="sk-plan-tile__badge is-offer">
+                                  Offer
                                 </span>
                               ) : plan.is_default ? (
                                 <span className="sk-plan-tile__badge">
@@ -481,7 +487,7 @@ export default function SuperkandleMemberModal({
                           <span className="sk-plan-tile__price">
                             {plan.is_trial ? (
                               <em>{money(0, { trial: true })}</em>
-                            ) : hasOffer ? (
+                            ) : hasOfferPrice ? (
                               <>
                                 <span className="sk-plans-card__strike">
                                   {money(plan.amount)}

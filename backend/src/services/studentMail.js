@@ -366,6 +366,43 @@ ${guide.text}`;
   });
 }
 
+export async function sendTradingviewIdUpdated({
+  student,
+  previousUsername,
+  nextUsername,
+}) {
+  const name = firstName(student);
+  const email = String(student?.email || "").trim();
+  if (!email) return;
+  const fromId = String(previousUsername || "").trim() || "(none)";
+  const toId = String(nextUsername || "").trim() || "(removed)";
+  const text = `Hi ${name},
+
+Your SuperKandle TradingView ID was updated.
+
+From: ${fromId}
+To: ${toId}
+
+The academy will share the SuperKandle invite to the new ID if your plan is active. Make sure you log in to TradingView with ${toId === "(removed)" ? "the correct username" : toId}.`;
+
+  await sendMail({
+    to: email,
+    subject: "Your SuperKandle TradingView ID was updated",
+    text,
+    html: layout(
+      "TradingView ID updated",
+      `<p>Hi ${escapeHtml(name)},</p>
+       <p>Your SuperKandle TradingView ID was updated.</p>
+       <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px">
+         <tr><td style="padding:8px 0;color:#667482;width:140px">From</td><td style="padding:8px 0"><strong>${escapeHtml(fromId)}</strong></td></tr>
+         <tr><td style="padding:8px 0;color:#667482">To</td><td style="padding:8px 0"><strong>${escapeHtml(toId)}</strong></td></tr>
+       </table>
+       <p>The academy will share the SuperKandle invite to the new ID if your plan is active.</p>
+       <p style="color:#667482;font-size:13px">Log in to TradingView with the new username so the invite can be found under Invite-only scripts.</p>`
+    ),
+  });
+}
+
 export async function sendInvitationShared({ student }) {
   const name = firstName(student);
   const tvUser = String(student.tradingview_username || "").trim();
@@ -481,4 +518,92 @@ export async function sendMembershipMailSafe(fn) {
   } catch (error) {
     console.error("SuperKandle mail failed:", error.message);
   }
+}
+
+function planPriceLine(plan) {
+  if (plan.is_trial || Number(plan.amount) === 0) return "Free";
+  const price =
+    plan.offer_price != null && Number(plan.offer_price) >= 0
+      ? Number(plan.offer_price)
+      : Number(plan.amount);
+  if (!Number.isFinite(price)) return "Paid";
+  return `$${price.toFixed(2)}`;
+}
+
+function planDurationLine(plan) {
+  const n = Number(plan.duration_value || plan.duration_months || 1) || 1;
+  const unit = String(plan.duration_unit || "month").toLowerCase();
+  if (unit === "day") return n === 1 ? "1 day" : `${n} days`;
+  if (unit === "week") return n === 1 ? "1 week" : `${n} weeks`;
+  return n === 1 ? "1 month" : `${n} months`;
+}
+
+export async function buildPlansUpdatedMail({
+  student,
+  displayPricedPlans = true,
+  plans = [],
+}) {
+  const name = firstName(student);
+  const link = await subscribeUrl();
+  const shown = plans.filter(
+    (plan) => displayPricedPlans || plan.is_trial || Number(plan.amount) === 0
+  );
+  const listText = shown.length
+    ? shown
+        .map(
+          (plan) =>
+            `- ${plan.name}: ${planPriceLine(plan)} · ${planDurationLine(plan)}`
+        )
+        .join("\n")
+    : "- Plans will show on the checkout page.";
+  const listHtml = shown.length
+    ? `<ul style="margin:0;padding-left:18px;line-height:1.6">${shown
+        .map(
+          (plan) =>
+            `<li><strong>${escapeHtml(plan.name)}</strong> — ${escapeHtml(
+              planPriceLine(plan)
+            )} · ${escapeHtml(planDurationLine(plan))}</li>`
+        )
+        .join("")}</ul>`
+    : `<p>Plans will show on the checkout page.</p>`;
+
+  const subject = "SuperKandle plans are updated — check out";
+  const text = `Hi ${name},
+
+SuperKandle plans have been updated. Paid plans are now available.
+
+${listText}
+
+Check out here:
+${link}
+
+If you have any questions, reply to this email.`;
+  const html = layout(
+    "Plans are updated",
+    `<p>Hi ${escapeHtml(name)},</p>
+     <p>SuperKandle plans have been updated. You can now view paid plans and check out.</p>
+     ${listHtml}
+     <p style="margin:20px 0 8px">
+       <a href="${escapeHtml(link)}" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#1a4a3f;color:#fff;text-decoration:none;font-weight:600">Check out SuperKandle</a>
+     </p>
+     <p style="color:#667482;font-size:13px">${escapeHtml(link)}</p>
+     <p>If you have any questions, reply to this email.</p>`
+  );
+  return { subject, text, html };
+}
+
+export async function sendPlansUpdatedMail({ student, displayPricedPlans, plans }) {
+  const email = String(student?.email || "").trim();
+  if (!email) return;
+  const mail = await buildPlansUpdatedMail({
+    student,
+    displayPricedPlans,
+    plans,
+  });
+  await sendMail({
+    to: email,
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
+  });
 }

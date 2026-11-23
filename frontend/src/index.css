@@ -6547,6 +6547,103 @@ body.portal-menu-lock {
   text-decoration: underline;
 }
 
+.sk-extend-modal {
+  width: min(440px, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(26, 74, 63, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(10, 22, 18, 0.22);
+}
+
+.sk-extend-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.2rem 0.85rem;
+}
+
+.sk-extend-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.sk-extend-body {
+  padding: 0 1.2rem 1rem;
+}
+
+.sk-extend-current {
+  margin: 0 0 0.85rem;
+  color: #6a7c76;
+  font-size: 0.86rem;
+}
+
+.sk-extend-current strong {
+  color: #12241f;
+}
+
+.sk-extend-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.sk-extend-presets button {
+  height: 40px;
+  border: 1px solid rgba(26, 74, 63, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  color: #1a4a3f;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.sk-extend-presets button.is-on {
+  background: #1a4a3f;
+  border-color: #1a4a3f;
+  color: #edf6f1;
+}
+
+.sk-extend-date {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+  color: #6a7c76;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.sk-extend-date input {
+  height: 40px;
+  padding: 0 0.7rem;
+  border: 1px solid rgba(26, 74, 63, 0.14);
+  border-radius: 10px;
+  font: inherit;
+  color: #12241f;
+}
+
+.sk-extend-hint {
+  margin: 0.75rem 0 0;
+  color: #6a7c76;
+  font-size: 0.8rem;
+}
+
+.sk-extend-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  padding: 0.9rem 1.2rem;
+  border-top: 1px solid rgba(26, 74, 63, 0.08);
+}
+
 .sk-table .row-actions {
   display: inline-flex;
   flex-wrap: nowrap;
@@ -7526,6 +7623,11 @@ body.portal-menu-lock {
   color: #1d4ed8;
 }
 
+.sk-plan-tile__badge.is-offer {
+  background: rgba(232, 93, 4, 0.14);
+  color: #c2410c;
+}
+
 @media (max-width: 720px) {
   .sk-plan-row {
     grid-template-columns: repeat(3, minmax(140px, 1fr));
@@ -7915,6 +8017,70 @@ body.portal-menu-lock {
   margin: 0.4rem 0 0;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.sk-mail-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(10, 22, 18, 0.62);
+}
+
+.sk-mail-preview {
+  width: min(640px, calc(100vw - 2rem));
+  max-height: min(90vh, 860px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(26, 74, 63, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(10, 22, 18, 0.22);
+}
+
+.sk-mail-preview header,
+.sk-mail-preview footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+}
+
+.sk-mail-preview header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.sk-mail-preview footer {
+  align-items: center;
+  justify-content: flex-end;
+  border-top: 1px solid rgba(26, 74, 63, 0.08);
+}
+
+.sk-mail-preview__frame {
+  width: 100%;
+  min-height: 280px;
+  height: 38vh;
+  border: 0;
+  background: #f4f7fb;
+}
+
+.sk-mail-preview__text {
+  margin: 0;
+  max-height: 7rem;
+  overflow: auto;
+  padding: 0.75rem 1.15rem;
+  border-top: 1px solid rgba(26, 74, 63, 0.08);
+  color: #5d6f69;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  background: #fbfcfb;
 }
 
 .sk-plans-backdrop {
