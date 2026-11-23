@@ -1,0 +1,438 @@
+%PDF-1.4
+%ARCH
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [ 6 0 R 8 0 R 10 0 R 12 0 R 14 0 R 16 0 R 18 0 R ] /Count 7 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Length 3411 >>
+stream
+q 0.055 0.13 0.22 rg 0 750 612 42 re f Q
+1 1 1 rg BT /F2 9 Tf 1 0 0 1 48 765 Tm (COMMUNITY TRADING APP  /  ARCHITECTURE PROPOSAL) Tj ET
+0.055 0.13 0.22 rg BT /F2 28 Tf 1 0 0 1 48 700 Tm (A private trading community) Tj ET
+0.12 0.37 0.48 rg BT /F1 13 Tf 1 0 0 1 48 675 Tm (Architecture, delivery plan, and proposed database structure) Tj ET
+q 0.91 0.96 0.97 rg 48 585 516 56 re f Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 60 629 Tm (Decision summary: extend the existing PostgreSQL and Express foundation into one) Tj ET
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 60 616 Tm (member platform for web and mobile. Keep staff administration, signal publishing,) Tj ET
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 60 603 Tm (member support, and private result review as separate permissioned workflows.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 563 Tm (Product shape) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 544 Tm (Members follow only channels assigned to them, read trader posts, react, submit trade results) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 531 Tm (privately, and start a one-to-one support conversation. Traders publish text, structured) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 518 Tm (signals, and voice notes. Staff permissions are granted by a super admin and scoped to their) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 505 Tm (responsibilities.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 478 Tm (System at a glance) Tj ET
+q 0.91 0.96 0.97 rg 48 453 516 22 re f Q
+0.05 0.27 0.37 rg BT /F2 8 Tf 1 0 0 1 58 460 Tm (WEB CLIENT  +  MOBILE CLIENT  ->  REST API / WEBSOCKET GATEWAY  ->  POSTGRESQL) Tj ET
+q 0.91 0.96 0.97 rg 48 423 516 22 re f Q
+0.05 0.27 0.37 rg BT /F2 8 Tf 1 0 0 1 58 430 Tm (                                                     |-> PRIVATE S3 MEDIA) Tj ET
+q 0.91 0.96 0.97 rg 48 393 516 22 re f Q
+0.05 0.27 0.37 rg BT /F2 8 Tf 1 0 0 1 58 400 Tm (                                                     |-> PUSH NOTIFICATIONS) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 369 Tm (The API is the authority for identity, access checks, message writes, and signed media URLs.) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 356 Tm (Web and mobile use the same endpoints and permission rules. PostgreSQL stores durable) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 343 Tm (application data; S3 stores audio and other uploaded files.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 316 Tm (Product decisions captured) Tj ET
+q 0.12 0.54 0.58 rg 50 300 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 297 Tm (Signal edits show an Edited marker; preserve prior versions for staff audit.) Tj ET
+q 0.12 0.54 0.58 rg 50 285 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 282 Tm (Results live in a separate staff-only review workflow, not a member-visible channel.) Tj ET
+q 0.12 0.54 0.58 rg 50 270 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 267 Tm (Each support conversation has an assigned agent and a reassignment history.) Tj ET
+q 0.12 0.54 0.58 rg 50 255 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 252 Tm (Plan both responsive web and mobile clients against a shared backend.) Tj ET
+q 0.82 0.87 0.90 RG 48 34 m 564 34 l S Q
+0.35 0.42 0.47 rg BT /F1 8 Tf 1 0 0 1 48 19 Tm (COMMUNITY ADMIN  |  ARCHITECTURE PROPOSAL  |  26 OCT 2026) Tj ET
+0.35 0.42 0.47 rg BT /F2 8 Tf 1 0 0 1 540 19 Tm (1 / 7) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 4694 >>
+stream
+q 0.055 0.13 0.22 rg 0 750 612 42 re f Q
+1 1 1 rg BT /F2 9 Tf 1 0 0 1 48 765 Tm (01  /  CURRENT-STATE REVIEW) Tj ET
+0.055 0.13 0.22 rg BT /F2 23 Tf 1 0 0 1 48 715 Tm (What exists today) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 682 Tm (This review is based on the project schema initializer and route code. It describes the schema) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 669 Tm (the application creates and queries. The live database was not queried, so externally managed) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 656 Tm (CRM tables and deployed-only migrations still need a read-only inventory before) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 643 Tm (implementation.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 616 Tm (Existing entities in the application schema) Tj ET
+q 0.12 0.54 0.58 rg 50 600 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 597 Tm (portal_admins: staff credentials, admin ID, name, email, active state, and admin type.) Tj ET
+q 0.12 0.54 0.58 rg 50 585 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 582 Tm (portal_admin_types, portal_admin_type_powers, portal_admin_powers: reusable admin) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 570 Tm (profiles and powers.) Tj ET
+q 0.12 0.54 0.58 rg 50 558 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 555 Tm (channels: channel metadata and creator fields; channel_admins maps staff to channels.) Tj ET
+q 0.12 0.54 0.58 rg 50 543 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 540 Tm (channel_members: maps students to channels with uniqueness per channel and student.) Tj ET
+q 0.12 0.54 0.58 rg 50 528 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 525 Tm (channel_messages: text/title, sender fields, edit timestamp, soft deletion, and media) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 513 Tm (metadata.) Tj ET
+q 0.12 0.54 0.58 rg 50 501 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 498 Tm (channel_message_reads and channel_message_admin_reads: read tracking for students and) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 486 Tm (staff.) Tj ET
+q 0.12 0.54 0.58 rg 50 474 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 471 Tm (superkandle_plans and superkandle_members: existing membership/payment-related feature.) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 456 Tm (The schema references students, courses, batches, and enrolments as existing CRM data. This) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 443 Tm (project initializer does not create the students table; inspect the live schema and ownership) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 430 Tm (of those tables before changing them.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 403 Tm (Useful behavior already present) Tj ET
+q 0.12 0.54 0.58 rg 50 387 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 384 Tm (Express API, PostgreSQL connection pool, bearer-token authentication for staff, and a) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 372 Tm (WebSocket channel layer.) Tj ET
+q 0.12 0.54 0.58 rg 50 360 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 357 Tm (Channel access assignments, admin powers, channel message posting, read tracking, media) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 345 Tm (upload, and message edits with edited_at.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 322 Tm (Gaps for the requested product) Tj ET
+q 0.12 0.54 0.58 rg 50 306 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 303 Tm (No app-side member login flow was confirmed in the inspected backend routes.) Tj ET
+q 0.12 0.54 0.58 rg 50 291 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 288 Tm (No reaction, support conversation, support assignment, result submission, or message) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 276 Tm (edit-history tables were found in the app schema initializer.) Tj ET
+q 0.12 0.54 0.58 rg 50 264 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 261 Tm (Uploads currently use local disk and public /uploads serving; this needs private S3) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 249 Tm (objects and access-checked signed URLs.) Tj ET
+q 0.12 0.54 0.58 rg 50 237 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 234 Tm (Super admin credentials are environment-based in the current login route; plan a managed) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 222 Tm (super-admin account and stronger session controls before launch.) Tj ET
+q 0.82 0.87 0.90 RG 48 34 m 564 34 l S Q
+0.35 0.42 0.47 rg BT /F1 8 Tf 1 0 0 1 48 19 Tm (COMMUNITY ADMIN  |  ARCHITECTURE PROPOSAL  |  26 OCT 2026) Tj ET
+0.35 0.42 0.47 rg BT /F2 8 Tf 1 0 0 1 540 19 Tm (2 / 7) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Length 3641 >>
+stream
+q 0.055 0.13 0.22 rg 0 750 612 42 re f Q
+1 1 1 rg BT /F2 9 Tf 1 0 0 1 48 765 Tm (02  /  COMPONENT ARCHITECTURE) Tj ET
+0.055 0.13 0.22 rg BT /F2 23 Tf 1 0 0 1 48 715 Tm (How the clients and services connect) Tj ET
+q 0.92 0.96 0.97 rg 48 617 120 42 re f Q
+q 0.09 0.39 0.48 RG 0.8 w 48 617 120 42 re S Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 57 635 Tm (Member web) Tj ET
+q 0.92 0.96 0.97 rg 48 561 120 42 re f Q
+q 0.09 0.39 0.48 RG 0.8 w 48 561 120 42 re S Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 57 579 Tm (Mobile app) Tj ET
+q 0.92 0.96 0.97 rg 48 505 120 42 re f Q
+q 0.09 0.39 0.48 RG 0.8 w 48 505 120 42 re S Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 57 523 Tm (Staff console) Tj ET
+q 0.92 0.96 0.97 rg 240 574 132 54 re f Q
+q 0.09 0.39 0.48 RG 0.8 w 240 574 132 54 re S Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 249 598 Tm (REST API) Tj ET
+q 0.92 0.96 0.97 rg 240 505 132 42 re f Q
+q 0.09 0.39 0.48 RG 0.8 w 240 505 132 42 re S Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 249 523 Tm (WebSocket gateway) Tj ET
+q 0.92 0.96 0.97 rg 432 617 132 42 re f Q
+q 0.09 0.39 0.48 RG 0.8 w 432 617 132 42 re S Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 441 635 Tm (PostgreSQL) Tj ET
+q 0.92 0.96 0.97 rg 432 561 132 42 re f Q
+q 0.09 0.39 0.48 RG 0.8 w 432 561 132 42 re S Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 441 579 Tm (Private S3 media) Tj ET
+q 0.92 0.96 0.97 rg 432 505 132 42 re f Q
+q 0.09 0.39 0.48 RG 0.8 w 432 505 132 42 re S Q
+0.055 0.13 0.22 rg BT /F2 9 Tf 1 0 0 1 441 523 Tm (Push service) Tj ET
+q 0.12 0.37 0.48 RG 1 w 168 638 m 240 601 l S Q
+q 0.12 0.37 0.48 RG 1 w 168 582 m 240 601 l S Q
+q 0.12 0.37 0.48 RG 1 w 168 526 m 240 601 l S Q
+q 0.12 0.37 0.48 RG 1 w 372 601 m 432 638 l S Q
+q 0.12 0.37 0.48 RG 1 w 372 601 m 432 582 l S Q
+q 0.12 0.37 0.48 RG 1 w 372 601 m 432 526 l S Q
+q 0.05 0.36 0.47 RG 1 w 168 638 m 203 638 l S Q
+q 0.05 0.36 0.47 RG 1 w 168 582 m 203 582 l S Q
+q 0.05 0.36 0.47 RG 1 w 168 526 m 203 526 l S Q
+q 0.05 0.36 0.47 RG 1 w 203 638 m 203 526 l S Q
+q 0.05 0.36 0.47 RG 1 w 203 526 m 240 526 l S Q
+0.05 0.36 0.47 rg BT /F1 8 Tf 1 0 0 1 173 494 Tm (WSS live events) Tj ET
+0.12 0.37 0.48 rg BT /F1 6 Tf 1 0 0 1 438 495 Tm (APNs / FCM / browser delivery) Tj ET
+q 0.82 0.87 0.90 RG 48 482 m 564 482 l S Q
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 458 Tm (Web and mobile share one authenticated API and data model. REST handles history, membership,) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 445 Tm (message writes, support, and result review. WebSockets deliver authorized live channel and) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 432 Tm (support events; the server rechecks authorization at subscription and delivery.) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 413 Tm (The API writes durable records to PostgreSQL and stores media in a private S3 bucket. A) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 400 Tm (notification worker sends push notifications after committed events. Push payloads should) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 387 Tm (contain only a safe preview; the client fetches protected content from the API after opening.) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 368 Tm (Each client uses both HTTPS and WSS. The WebSocket gateway is part of the backend trust) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 355 Tm (boundary, not a direct client-to-database or client-to-S3 connection.) Tj ET
+q 0.82 0.87 0.90 RG 48 34 m 564 34 l S Q
+0.35 0.42 0.47 rg BT /F1 8 Tf 1 0 0 1 48 19 Tm (COMMUNITY ADMIN  |  ARCHITECTURE PROPOSAL  |  26 OCT 2026) Tj ET
+0.35 0.42 0.47 rg BT /F2 8 Tf 1 0 0 1 540 19 Tm (3 / 7) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 9 0 R >>
+endobj
+11 0 obj
+<< /Length 4722 >>
+stream
+q 0.055 0.13 0.22 rg 0 750 612 42 re f Q
+1 1 1 rg BT /F2 9 Tf 1 0 0 1 48 765 Tm (03  /  TARGET ARCHITECTURE) Tj ET
+0.055 0.13 0.22 rg BT /F2 23 Tf 1 0 0 1 48 715 Tm (Services and trust boundaries) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 674 Tm (Application components) Tj ET
+q 0.12 0.54 0.58 rg 50 658 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 655 Tm (Staff web console: manage users, roles, channel access, signals, support queue, result) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 643 Tm (review, and audit events.) Tj ET
+q 0.12 0.54 0.58 rg 50 631 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 628 Tm (Member web and mobile clients: channel feed, signal detail, reactions, result) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 616 Tm (submission, support chat, and notifications.) Tj ET
+q 0.12 0.54 0.58 rg 50 604 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 601 Tm (Backend API: authentication, authorization, REST reads/writes, validation, audit) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 589 Tm (logging, media URL issuance, and notification events.) Tj ET
+q 0.12 0.54 0.58 rg 50 577 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 574 Tm (WebSocket gateway: deliver authorized channel and support events; re-check access on) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 562 Tm (connect, subscribe, and relevant access changes.) Tj ET
+q 0.12 0.54 0.58 rg 50 550 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 547 Tm (PostgreSQL: accounts, permissions, messages, assignments, results, reactions, support) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 535 Tm (history, and audit trail.) Tj ET
+q 0.12 0.54 0.58 rg 50 523 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 520 Tm (Private S3 bucket: voice notes and other media. Store object key, content type, size,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 508 Tm (duration, and owner in PostgreSQL.) Tj ET
+q 0.12 0.54 0.58 rg 50 496 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 493 Tm (Push notification service: notify on new signals, support replies, and assignment) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 481 Tm (changes, respecting user preferences.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 458 Tm (Authorization rules to enforce server-side) Tj ET
+q 0.12 0.54 0.58 rg 50 442 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 439 Tm (Member reads require an active account and active channel membership; never trust a) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 427 Tm (client-provided channel ID alone.) Tj ET
+q 0.12 0.54 0.58 rg 50 415 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 412 Tm (Only assigned traders/staff with send_signals and channel scope can publish. Only the) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 400 Tm (author or authorized supervisor can edit; edits create immutable history.) Tj ET
+q 0.12 0.54 0.58 rg 50 388 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 385 Tm (Result submissions are visible only to the submitting member and authorized staff. Keep) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 373 Tm (them out of member channel queries and broad WebSocket rooms.) Tj ET
+q 0.12 0.54 0.58 rg 50 361 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 358 Tm (Support messages are visible to the conversation member and assigned agent; supervisors) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 346 Tm (may receive explicit manage_support_all scope.) Tj ET
+q 0.12 0.54 0.58 rg 50 334 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 331 Tm (S3 objects stay private. Issue short-lived signed URLs only after the same resource) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 319 Tm (access check used for the message or result.) Tj ET
+q 0.12 0.54 0.58 rg 50 307 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 304 Tm (When channel access is revoked, reject subsequent API reads, media URL requests, and) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 292 Tm (WebSocket delivery immediately.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 269 Tm (Operational baseline) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 250 Tm (Use database migrations rather than startup-time schema mutation for new production features;) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 237 Tm (add backups, structured logs, rate limits, upload limits, retention rules, and monitoring) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 224 Tm (before broad rollout.) Tj ET
+q 0.82 0.87 0.90 RG 48 34 m 564 34 l S Q
+0.35 0.42 0.47 rg BT /F1 8 Tf 1 0 0 1 48 19 Tm (COMMUNITY ADMIN  |  ARCHITECTURE PROPOSAL  |  26 OCT 2026) Tj ET
+0.35 0.42 0.47 rg BT /F2 8 Tf 1 0 0 1 540 19 Tm (4 / 7) Tj ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 11 0 R >>
+endobj
+13 0 obj
+<< /Length 4440 >>
+stream
+q 0.055 0.13 0.22 rg 0 750 612 42 re f Q
+1 1 1 rg BT /F2 9 Tf 1 0 0 1 48 765 Tm (04  /  PROPOSED DATABASE) Tj ET
+0.055 0.13 0.22 rg BT /F2 23 Tf 1 0 0 1 48 715 Tm (Core tables to add or evolve) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 682 Tm (Retain the working channel and CRM entities where possible. Introduce explicit member identity) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 669 Tm (and status only after confirming whether the CRM students table already provides those fields) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 656 Tm (and authentication.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 629 Tm (Accounts and access) Tj ET
+q 0.12 0.54 0.58 rg 50 613 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 610 Tm (members \(or CRM students\): id, auth_subject/password_hash, status, created_at,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 598 Tm (last_seen_at. Do not duplicate student PII if CRM remains the source of truth.) Tj ET
+q 0.12 0.54 0.58 rg 50 586 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 583 Tm (permission_catalog: key, description, scope_type. Seed powers such as create_channels,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 571 Tm (assign_channel_access, send_signals, manage_support, review_results, and) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 559 Tm (view_channel_people.) Tj ET
+q 0.12 0.54 0.58 rg 50 547 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 544 Tm (portal_admins and admin type tables: retain; add created_by_admin_id,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 532 Tm (updated_by_admin_id, and explicit account lifecycle as needed.) Tj ET
+q 0.12 0.54 0.58 rg 50 520 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 517 Tm (channel_members: evolve with granted_by_admin_id, granted_at, revoked_at, and optional) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 505 Tm (source/reason; unique active membership per member/channel.) Tj ET
+q 0.12 0.54 0.58 rg 50 493 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 490 Tm (channel_admins: retain as channel scope assignment; store assignment actor and) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 478 Tm (timestamps if audit detail is needed.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 455 Tm (Channels and signals) Tj ET
+q 0.12 0.54 0.58 rg 50 439 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 436 Tm (channels: retain; add channel_type \(signals/general\), visibility/status, and optional) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 424 Tm (settings JSONB. Enforce staff-only result visibility in dedicated tables, not a flag) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 412 Tm (alone.) Tj ET
+q 0.12 0.54 0.58 rg 50 400 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 397 Tm (channel_messages: retain; add message_type \(text/signal/voice\), signal_data JSONB,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 385 Tm (updated_by_portal_admin_id, and version number if useful.) Tj ET
+q 0.12 0.54 0.58 rg 50 373 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 370 Tm (channel_message_edits: id, message_id, editor_portal_admin_id, old_title, old_body,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 358 Tm (old_signal_data JSONB, edited_at. Insert old version and update message in one) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 346 Tm (transaction.) Tj ET
+q 0.12 0.54 0.58 rg 50 334 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 331 Tm (channel_message_media: id, message_id, object_key, media_type, mime_type, byte_size,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 319 Tm (duration_ms, original_name, created_at. Replace public local paths with private S3 keys.) Tj ET
+q 0.12 0.54 0.58 rg 50 307 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 304 Tm (channel_message_reactions: id, message_id, member_id, reaction, created_at; unique) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 292 Tm (\(message_id, member_id, reaction\).) Tj ET
+q 0.12 0.54 0.58 rg 50 280 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 277 Tm (Retain channel_message_reads and channel_message_admin_reads for unread and seen) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 265 Tm (indicators.) Tj ET
+q 0.82 0.87 0.90 RG 48 34 m 564 34 l S Q
+0.35 0.42 0.47 rg BT /F1 8 Tf 1 0 0 1 48 19 Tm (COMMUNITY ADMIN  |  ARCHITECTURE PROPOSAL  |  26 OCT 2026) Tj ET
+0.35 0.42 0.47 rg BT /F2 8 Tf 1 0 0 1 540 19 Tm (5 / 7) Tj ET
+endstream
+endobj
+14 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 13 0 R >>
+endobj
+15 0 obj
+<< /Length 5513 >>
+stream
+q 0.055 0.13 0.22 rg 0 750 612 42 re f Q
+1 1 1 rg BT /F2 9 Tf 1 0 0 1 48 765 Tm (05  /  PROPOSED DATABASE) Tj ET
+0.055 0.13 0.22 rg BT /F2 23 Tf 1 0 0 1 48 715 Tm (Support, results, and audit) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 674 Tm (Support conversations) Tj ET
+q 0.12 0.54 0.58 rg 50 658 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 655 Tm (support_conversations: id, member_id, status \(open/pending/resolved\), assigned_agent_id,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 643 Tm (subject, created_at, updated_at, last_message_at, closed_at.) Tj ET
+q 0.12 0.54 0.58 rg 50 631 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 628 Tm (support_messages: id, conversation_id, sender_kind, member_id or portal_admin_id, body,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 616 Tm (created_at, edited_at, deleted_at. Use a check constraint so exactly one sender identity) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 604 Tm (matches sender_kind.) Tj ET
+q 0.12 0.54 0.58 rg 50 592 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 589 Tm (support_assignments: id, conversation_id, agent_id, assigned_by_admin_id, assigned_at,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 577 Tm (unassigned_at, reason. This preserves the assignment history while the current agent) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 565 Tm (remains on support_conversations.) Tj ET
+q 0.12 0.54 0.58 rg 50 553 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 550 Tm (support_message_reads: message_id, viewer identity, seen_at, with uniqueness per) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 538 Tm (message/viewer.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 515 Tm (Private trade results) Tj ET
+q 0.12 0.54 0.58 rg 50 499 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 496 Tm (trade_results: id, member_id, optional source_message_id, instrument, direction,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 484 Tm (entry_price, exit_price, outcome, pnl_amount, pnl_percent, notes, submitted_at,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 472 Tm (review_status, reviewed_by_admin_id, reviewed_at.) Tj ET
+q 0.12 0.54 0.58 rg 50 460 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 457 Tm (trade_result_media: id, trade_result_id, object_key, mime_type, byte_size, created_at.) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 445 Tm (Keep S3 private and issue signed URLs after staff/member ownership checks.) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 430 Tm (Use numeric columns with explicit precision for prices and P&L. Store currency and timezone) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 417 Tm (assumptions if the business needs them. Validate all fields server-side; never infer a result) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 404 Tm (outcome from a screenshot.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 377 Tm (Audit and notification records) Tj ET
+q 0.12 0.54 0.58 rg 50 361 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 358 Tm (admin_audit_log: id, actor_portal_admin_id, action, target_type, target_id, before_json,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 346 Tm (after_json, request_id, created_at. Record permission changes, channel access changes,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 334 Tm (edits, result reviews, and support reassignments.) Tj ET
+q 0.12 0.54 0.58 rg 50 322 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 319 Tm (device_tokens: member_id, platform, token, last_seen_at, disabled_at; unique active) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 307 Tm (token.) Tj ET
+q 0.12 0.54 0.58 rg 50 295 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 292 Tm (notification_outbox: id, event_type, recipient_member_id, payload_json, created_at,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 280 Tm (processed_at, attempt_count. Use an outbox worker so database commits and notifications) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 268 Tm (do not drift.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 245 Tm (Important relationships and indexes) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 226 Tm (Every message belongs to one channel; every reaction belongs to one message and member; every) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 213 Tm (support message belongs to one conversation; every result belongs to one member. Index) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 200 Tm (channel_messages\(channel_id, created_at DESC, id DESC\), channel_members\(member_id,) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 187 Tm (channel_id\), support_conversations\(assigned_agent_id, status, last_message_at DESC\),) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 174 Tm (support_messages\(conversation_id, created_at\), and trade_results\(submitted_at DESC,) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 161 Tm (review_status\).) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 142 Tm (Use foreign keys and unique constraints for ownership and deduplication. Prefer soft deletion) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 129 Tm (or status transitions where audit/history matters. Apply migrations in small, reversible) Tj ET
+0.12 0.17 0.22 rg BT /F1 10 Tf 1 0 0 1 48 116 Tm (steps.) Tj ET
+q 0.82 0.87 0.90 RG 48 34 m 564 34 l S Q
+0.35 0.42 0.47 rg BT /F1 8 Tf 1 0 0 1 48 19 Tm (COMMUNITY ADMIN  |  ARCHITECTURE PROPOSAL  |  26 OCT 2026) Tj ET
+0.35 0.42 0.47 rg BT /F2 8 Tf 1 0 0 1 540 19 Tm (6 / 7) Tj ET
+endstream
+endobj
+16 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 15 0 R >>
+endobj
+17 0 obj
+<< /Length 4809 >>
+stream
+q 0.055 0.13 0.22 rg 0 750 612 42 re f Q
+1 1 1 rg BT /F2 9 Tf 1 0 0 1 48 765 Tm (06  /  DELIVERY PLAN) Tj ET
+0.055 0.13 0.22 rg BT /F2 23 Tf 1 0 0 1 48 715 Tm (A safe path to the first release) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 674 Tm (Phase 0 - verify and baseline) Tj ET
+q 0.12 0.54 0.58 rg 50 658 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 655 Tm (Inventory live PostgreSQL tables, columns, indexes, constraints, and row counts using a) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 643 Tm (read-only account; identify CRM ownership of students and auth.) Tj ET
+q 0.12 0.54 0.58 rg 50 631 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 628 Tm (Confirm the member authentication approach, account lifecycle, channel access source,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 616 Tm (result fields, retention policy, and notification needs.) Tj ET
+q 0.12 0.54 0.58 rg 50 604 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 601 Tm (Write versioned migration and rollback scripts; capture a database backup before schema) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 589 Tm (changes.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 566 Tm (Phase 1 - member access and secure media) Tj ET
+q 0.12 0.54 0.58 rg 50 550 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 547 Tm (Implement member login/session refresh and server-side channel authorization for REST) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 535 Tm (and WebSockets.) Tj ET
+q 0.12 0.54 0.58 rg 50 523 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 520 Tm (Build private S3 upload flow: API authorizes upload, returns short-lived upload URL,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 508 Tm (records object metadata, and issues download URLs after access checks.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 485 Tm (Phase 2 - signal publishing) Tj ET
+q 0.12 0.54 0.58 rg 50 469 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 466 Tm (Add structured signal template and free text/voice messages, scoped trader permissions,) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 454 Tm (edit history, Edited marker, reactions, and live updates.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 431 Tm (Phase 3 - assigned support) Tj ET
+q 0.12 0.54 0.58 rg 50 415 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 412 Tm (Add member-to-support conversations, staff queue, claim/assign/reassign flow, message) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 400 Tm (history, unread state, and supervisor access.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 377 Tm (Phase 4 - private results) Tj ET
+q 0.12 0.54 0.58 rg 50 361 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 358 Tm (Add member submission form, private attachments, staff-only queue, review status, and) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 346 Tm (audit trail. Enforce privacy in every API and socket query.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 323 Tm (Phase 5 - web/mobile launch readiness) Tj ET
+q 0.12 0.54 0.58 rg 50 307 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 304 Tm (Complete responsive member web and mobile clients; push notifications; backups/restore) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 292 Tm (drill; observability; abuse controls; accessibility; staged rollout.) Tj ET
+0.05 0.36 0.47 rg BT /F2 12 Tf 1 0 0 1 48 269 Tm (Release acceptance checks) Tj ET
+q 0.12 0.54 0.58 rg 50 253 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 250 Tm (A member cannot read or fetch media for an unassigned channel, another member result, or) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 238 Tm (another member support chat.) Tj ET
+q 0.12 0.54 0.58 rg 50 226 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 223 Tm (Permission changes and access revocation apply to API and WebSocket delivery without) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 211 Tm (trusting stale client state.) Tj ET
+q 0.12 0.54 0.58 rg 50 199 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 196 Tm (Signal edits show Edited and preserve the prior version; only permitted users can edit.) Tj ET
+q 0.12 0.54 0.58 rg 50 184 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 181 Tm (A support thread has one current assigned agent and a queryable reassignment history.) Tj ET
+q 0.12 0.54 0.58 rg 50 169 4 4 re f Q
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 166 Tm (Result submissions remain staff-only unless an explicit future product decision changes) Tj ET
+0.12 0.17 0.22 rg BT /F1 9 Tf 1 0 0 1 62 154 Tm (that policy.) Tj ET
+q 0.82 0.87 0.90 RG 48 34 m 564 34 l S Q
+0.35 0.42 0.47 rg BT /F1 8 Tf 1 0 0 1 48 19 Tm (COMMUNITY ADMIN  |  ARCHITECTURE PROPOSAL  |  26 OCT 2026) Tj ET
+0.35 0.42 0.47 rg BT /F2 8 Tf 1 0 0 1 540 19 Tm (7 / 7) Tj ET
+endstream
+endobj
+18 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 17 0 R >>
+endobj
+xref
+0 19
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000164 00000 n 
+0000000234 00000 n 
+0000000309 00000 n 
+0000003771 00000 n 
+0000003907 00000 n 
+0000008652 00000 n 
+0000008788 00000 n 
+0000012480 00000 n 
+0000012617 00000 n 
+0000017391 00000 n 
+0000017529 00000 n 
+0000022021 00000 n 
+0000022159 00000 n 
+0000027724 00000 n 
+0000027862 00000 n 
+0000032723 00000 n 
+trailer
+<< /Size 19 /Root 1 0 R >>
+startxref
+32861
+%%EOF
